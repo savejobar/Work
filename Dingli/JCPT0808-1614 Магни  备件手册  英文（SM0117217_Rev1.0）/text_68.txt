@@ -1,0 +1,3 @@
+Parts Manual Section 5 Electrical System
+506.1 Electrical Harness (JCPT1412DC, JCPT1612DC,
+JCPT1614DC)

@@ -1,0 +1,20 @@
+arts Manual
+03.1 Electrical harness (Elec
+Battery) (JCPT0808AC,
+JCPT1012AC, JCPT121
+Pla
+Bo
+Pressure
+3
+Sensor
+2
+Coil
+4
+Coil
+Function
+Manifold
+1
+Controller
+Charger
+Fuse
+Assembly

@@ -1,0 +1,3 @@
+Section 3 Platform Parts Manual
+307.1 Protective Device Assembly (JCPT0808HD/DC,
+JCPT1008HD/DC) (Option)

@@ -1,0 +1,2 @@
+Section 4 Platform Parts Manual
+406.1 Anti Collision Device (Option)

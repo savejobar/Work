@@ -1,0 +1,8 @@
+ection 7 Electrical System
+1 Electrical Harness - CO
+12
+fuse
+Copper
+Bar
+11
+10

@@ -1,0 +1,11 @@
+Parts Manual Section 4 Hydraulic System
+411.1 Hydraulic Hoses and Fittings-Alternator (option)
+Function
+P 3 1 6 4 Generator
+manifold
+Alternator
+T 3 2 6 5 Manifold
+Hose Assembly
+Adapter
+Union
+411.1 Hydraulic Hoses and Fittings-Alternator (option)

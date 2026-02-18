@@ -1,0 +1,30 @@
+s Manual
+1 Electrical Harness (JCPT121
+P
+B
+Angle
+Sensor
+Pressure
+Sensor
+Limit Switch
+(Lift UP)
+Limit Switch
+(Lift Down)
+Limit Switch
+(Pothole)
+Limit Switch 5
+(Pothole)
+Tilt
+Sensor
+Beacon
+3 4
+Coil
+2
+1
+Controller
+14
+Charger 33
+Fu
+Asse
+Battery 32
+13

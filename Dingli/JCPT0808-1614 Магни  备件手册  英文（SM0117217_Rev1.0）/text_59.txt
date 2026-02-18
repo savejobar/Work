@@ -1,0 +1,3 @@
+Section 5 Electrical System Parts Manual
+502.1 Electrical Harness (JCPT0808DC, JCPT1008DC,
+JCPT1012DC)

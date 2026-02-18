@@ -1,0 +1,4 @@
+Section 3 Platform Parts Manual
+303.1 Main Platform Assembly (JCPT1012HD/DC,
+JCPT1212HD/DC, JCPT1412HD/DC, JCPT1612HD/DC,
+JCPT1614HD/DC)

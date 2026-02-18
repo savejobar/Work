@@ -1,0 +1,13 @@
+Parts Manual Section 2 Scissor
+209.1 Scissor Arm pin joint H
+1 2 3 4 5
+6
+7
+3
+6
+3
+6
+7
+3
+5 8 6 1
+209.1 Scissor Arm pin joint H

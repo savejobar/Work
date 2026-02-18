@@ -1,0 +1,21 @@
+"Item","Part Number","Description","Qty.","Remark"
+"27","00005392","Latch","2",""
+"28","00000639","MC2M Controller","1",""
+"--","85000000","MC2M Controller (CANOPEN PVG Valve)","1","canbus load 
+sensor"
+"--","85000001","MC2M Controller (CANOPEN PVG Valve)","1","analog load 
+sensor"
+"--","85000010","MC2M Controller (J1939 PVG Valve)","1","canbus load 
+sensor"
+"--","85000011","MC2M Controller (J1939 PVG Valve)","1","analog load 
+sensor"
+"29","00002313","Screw  GB/T 818  M5 × 14 - H","4",""
+"30","00000752","Base With 1 NC Contact","1",""
+"31","00000754","Red Mushroom Head","1",""
+"32","00006135","Switch, Toggle","4",""
+"33","00002712","Nut  GB/T 6170  M4","8",""
+"34","00000779","Spring Washer  GB/T 93  4","8",""
+"35","00000778","Flat Washer  GB/T 97.1  4","8",""
+"36","92000093","Cover, Platform Control Box","1",""
+"37","00005394","Joystick","2",""
+"38","00001232","Screw  GB/T 818  M4 × 16 - H","8",""

@@ -1,0 +1,13 @@
+tery)
+0
+Isola
+Contactor
+Motor
+Controller
+(Right)
+1
+14
+Drive
+Moter
+Assembly
+Charger

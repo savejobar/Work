@@ -1,0 +1,20 @@
+ction 5 Electrical System
+1.2 Electrical Harness (Hydra
+Battery) (JCPT1412HA, JC
+JCPT1614HA)
+Pla
+Bo
+Pressure
+3
+Sensor
+2
+Coil
+4
+Coil
+Function
+Manifold
+1
+Controller
+Charger
+Fuse
+Assembly

@@ -1,0 +1,3 @@
+Section 3 Platform Parts Manual
+301.1 Main Platform Assembly (JCPT0808HA/AC,
+JCPT1008HA/AC)

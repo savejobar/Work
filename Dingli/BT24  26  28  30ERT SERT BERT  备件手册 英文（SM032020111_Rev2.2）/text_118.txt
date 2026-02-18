@@ -1,0 +1,4 @@
+Parts Manual Section 7 Electrical System
+7-11 Platform Control Box Assembly - COBO Controller (BT30ERT,
+BT28ERT, BT26ERT, BT24ERT, BT28BERT, BT26BERT,
+BT24BERT)

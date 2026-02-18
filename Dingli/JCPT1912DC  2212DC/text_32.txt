@@ -1,0 +1,8 @@
+Parts Manual Section 2 Scissor
+207.1 Scissor Arm pin joint F
+1 2
+6
+5
+2
+1 3 4 3
+207.1 Scissor Arm pin joint F

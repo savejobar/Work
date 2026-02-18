@@ -1,0 +1,11 @@
+Parts Manual
+501.1 Electrical Harness (Kub
+Angle
+Sensor
+Buzzer
+Beacon
+Horn
+Tilt
+Sensor
+Temperature
+Switch

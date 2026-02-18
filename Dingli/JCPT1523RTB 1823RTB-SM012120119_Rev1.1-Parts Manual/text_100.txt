@@ -1,0 +1,2 @@
+Parts Manual Section 3 Platform
+309.1 Anti-collision Device (Option)

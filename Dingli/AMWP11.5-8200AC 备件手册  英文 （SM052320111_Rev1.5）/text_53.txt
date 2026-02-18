@@ -1,0 +1,15 @@
+l System
+Harness (Lithium Ba
+4
+DC
+Contactor
+9
+Drive Motor
+Controller
+7
+Drive Motor
+(Left)
+Drive Motor
+(Right)
+1
+Charger

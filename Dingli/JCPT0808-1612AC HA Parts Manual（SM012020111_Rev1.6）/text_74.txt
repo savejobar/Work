@@ -1,0 +1,20 @@
+Section 5 Electrical System
+502.1 Electrical harness (Hydra
+Battery)
+Pla
+B
+Pressure
+3
+Sensor
+2
+Coil
+4
+Coil
+Function
+Manifold
+1
+Controller
+Charger
+Fuse
+Assembly
+7

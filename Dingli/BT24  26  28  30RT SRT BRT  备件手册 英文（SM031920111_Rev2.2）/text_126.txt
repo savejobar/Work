@@ -1,0 +1,3 @@
+Section 7 Electrical System Parts Manual
+7-10 Platform Control Box Assembly - COBO Controller (BT30SRT,
+BT28SRT, BT26SRT)

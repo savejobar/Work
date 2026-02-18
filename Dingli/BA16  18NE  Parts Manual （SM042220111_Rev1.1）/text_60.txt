@@ -1,0 +1,151 @@
+arts Manual Section 6 Hydraulic System
+2 Functional Hydraulic Circuit
+42 42
+2V
+31
+31
+1V
+32
+32
+32
+32
+32
+32 42
+92
+92
+13
+13
+4
+4
+4
+4
+4
+4
+4
+4
+4
+Slave Cylinder
+Upper Lifting Cylinder
+2V 1V
+Mid Lifting Cylinder Lower Lifting Cylinder
+2V
+2LiP
+1V
+2V
+1V
+2V
+2LiP 1LiP
+1V
+B
+A UL
+LL
+2LP
+1LP
+RL
+CL
+2RP
+Telescope Cylinder
+1V 2V
+B2P
+B1P
+Jib Cylinder
+5
+7
+8
+etatoR
+rednilyC
+62
+62
+42
+5
+7
+5
+4
+8
+01
+7
+52
+32
+4
+5
+5
+4
+11
+21
+82
+72
+42
+32
+52
+4
+5
+2
+5
+4
+53
+6
+5
+7
+21
+2A
+2B
+1A
+1B
+41
+noitisnarT
+dlofinaM
+5
+7
+1
+T
+P
+5
+4
+22
+22
+41
+suonorhcnyS
+dlofinaM
+2R
+1R
+dlofinaM
+noitcnuF
+Master Cylinder
+9
+51
+61
+9
+71
+31
+81
+5
+43
+33
+5
+5
+91
+31
+5
+5
+02
+9
+9
+12
+5
+5
+4
+31
+31
+4
+03
+03
+C
+1L
+CM
+5
+23
+21
+5
+4
+1P
+1T
