@@ -1,0 +1,40 @@
+INFORMATION
+1. PART NUMBER REFERENCE LIST
+1.1 EXAMPLE
+适用号机
+序号 编码 版本 数量 互换 选配
+DESCRIPTION 名 称 SUIT
+POS. COD. VER. QTY INT CHO
+NUM
+1 805502000000 1 CABIN BODY STRUCTURE 驾驶室主体 1 -221 N
+805502000000 2 CABIN BODY STRUCTURE 驾驶室主体 1 222-268 Y
+805502000000 3 CABIN BODY STRUCTURE 驾驶室主体 1 269- I
+2 805501000000 1 DOOR 驾驶室门 1
+3 760505000004 1 RUBBER TRIM 玻璃胶条 4
+4 810216400000 1 LEFT CONTROL BOX ASSEMBLY 左操纵箱总成(配封闭司机室) 1 -123 N Y
+810216400000 2 LEFT CONTROL BOX ASSEMBLY 左操纵箱总成(配封闭司机室) 1 124- Y
+⑴ ⑵ ⑶ ⑷ ⑸ ⑹ ⑺ ⑻ ⑼
+1.2 EXPLANATION
+⑴ Illustration reference number
+⑵ Part code ( PDM )
+⑶ Part version number.
+⑷ Part name in English
+⑸ Part name in Chinese
+⑹ Quantity required (see note2 below)
+⑺ Suit number (Indicate the part used in which number machine ), for example : In the first line,＂-221＂:Indicate the
+part (CABIN BODY STRUCTURE) used in the machine before No. 221. ＂222-268＂: Indicate the part used in the
+machine from No.222 to No.268.＂269-＂:Indicate the part used in the machine from No.269. The blank, Indicate the
+part fit every machine. In the fourth line, indicate the part (LEFT CONTROL BOX ASSEMBLY (CLOSE CABIN)) used in
+the machine from No.123 that assemble close cabin.
+⑻ Interchange(see note 1 below) .
+⑼ Choose and configure(if the part or assembly has other configures,written in Y), the blank indicates the part is
+standard assemblage only.
+1.3 NOTE 1
+The interchange shown in column ⑻ indicates if the part could interchange with other part. The column is written in
+N、Y、T、P、I、H、*.These letters’s mean are following:
+N：Indicates the two parts can’t be interchanged;
+Y：Indicates the two parts are interchanged utterly;
+T：Indicates the part in whole replaces the former part used in former machine;
+P：Indicates the part replaces the former part being not used any more;
+I：Indicates the part replaces the former part but doesn’t replace opposite.
+V
