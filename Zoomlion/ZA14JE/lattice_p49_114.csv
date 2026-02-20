@@ -1,0 +1,27 @@
+"No.","Material No.","Item and Spec","Unit","Note"
+"1","1020005380","DC motor","1",""
+"2","00773406230450090","Functional pump-D1 to 与 A1 
+wiring","1",""
+"3","00773406230450070","Functional pump- driver M to 
+functional pump D2","1",""
+"4","00773406230450060","Functional pump- driver B+ to 
+functional pump A2","1",""
+"5","00773406230450100","Battery positive pole to manual 
+switch wiring","1",""
+"6","00773406230450110","Manual switch to wire spool positive 
+pole wiring","1",""
+"7","00773406230450120","Battery negative pole to wire spool 
+negative pole","1",""
+"8","00773406230450130","Left spool B﹢  to brake IN","1",""
+"9","00773406230450140","Brake OUT to spool B﹢-right 
+wiring","1",""
+"10","00773406230450150","Spool B﹣  to brake negative pole","1",""
+"11","/","Brake","1",""
+"12","1029900667","Main power switch (rotary knob)","1",""
+"13","/","Auxiliary power","1",""
+"14","/","Emergency pump","1",""
+"15","00773406230450170","Emergency pump negative pole to 
+auxiliary pump negative pole","1",""
+"16","00773406230450160","Emergency battery positive pole to 
+auxiliary pump positive pump","1",""
+"17","/","Charger","1",""
