@@ -1,0 +1,2 @@
+Parts Manual
+Boom electrical(Limit switch of boom(CE))

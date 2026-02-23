@@ -1,0 +1,2 @@
+Parts Manual
+Platform electrical(Tilting angle sensor(CE))

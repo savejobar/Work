@@ -1,0 +1,1 @@
+rntable electrical(Terminal block(CE))

@@ -1,0 +1,2 @@
+rts Manual
+Turntable electrical(Controller)

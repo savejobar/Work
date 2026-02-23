@@ -1,0 +1,2 @@
+rm electric control
+ubota power system
