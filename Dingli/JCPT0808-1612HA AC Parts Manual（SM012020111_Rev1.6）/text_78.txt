@@ -1,4 +1,0 @@
-Section 5 Electrical System Parts Manual
-503.1 Electrical harness (Electric Motor Drive) (Lead-acid
-Battery) (JCPT0808AC, JCPT0812AC, JCPT1008AC,
-JCPT1012AC, JCPT1212AC)

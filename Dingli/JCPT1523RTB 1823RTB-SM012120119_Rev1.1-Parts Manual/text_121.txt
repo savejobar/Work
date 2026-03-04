@@ -1,6 +1,0 @@
-Parts Manual
-10.1 Hydra
-S W
-6 6
-LF Outrigger
-cylinder

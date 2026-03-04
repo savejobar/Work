@@ -1,4 +1,0 @@
-Section 7 Electrical System Parts Manual
-7-12 Platform Control Box Assembly - Parker Controller (BT30ERT,
-BT28ERT, BT26ERT, BT24ERT, BT28BERT, BT26BERT,
-BT24BERT)

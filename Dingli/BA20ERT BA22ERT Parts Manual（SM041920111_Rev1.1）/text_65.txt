@@ -1,6 +1,0 @@
-s Manual
-Harness Compo
-600A Fuse
-Copper Bar
-Motor
-3

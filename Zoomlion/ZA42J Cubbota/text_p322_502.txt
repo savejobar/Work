@@ -1,2 +1,0 @@
-Parts Manual
-Chassis electrical(Controller(CE/GB))

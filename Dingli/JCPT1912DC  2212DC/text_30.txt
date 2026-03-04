@@ -1,8 +1,0 @@
-Parts Manual Section 2 Scissor
-205.1 Scissor Arm pin joint D
-1 2 3 4
-1
-2
-3
-5 6 5
-205.1 Scissor Arm pin joint D

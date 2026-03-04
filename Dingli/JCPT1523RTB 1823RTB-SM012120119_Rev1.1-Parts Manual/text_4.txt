@@ -1,5 +1,0 @@
-Parts Manual Section 1 Chassis
-105.1 Right Motor Assembly
-1 2 3
-8 7 6 5 4
-105.1 Right Motor Assembly

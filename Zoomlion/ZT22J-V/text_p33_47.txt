@@ -1,2 +1,0 @@
-orm tilt senso
-syst

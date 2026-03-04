@@ -1,2 +1,0 @@
-generator electric
-generator electric

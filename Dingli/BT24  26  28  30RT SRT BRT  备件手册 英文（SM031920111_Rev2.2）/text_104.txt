@@ -1,3 +1,0 @@
-Parts Manual Section 6 Hydraulic System
-6-5 JIB Circuit (BT30RT, BT28RT, BT26RT, BT24RT, BT28BRT,
-BT26BRT, BT24BRT)

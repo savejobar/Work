@@ -1,4 +1,0 @@
-Section 3 Platform Parts Manual
-307.1 Protective Device Assembly (JCPT1012HD/DC,
-JCPT1212HD/DC, JCPT1412HD/DC, JCPT1612HD/DC)
-(Option)

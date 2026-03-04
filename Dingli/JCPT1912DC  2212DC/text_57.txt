@@ -1,7 +1,0 @@
-ion 5 Electrical System
-1 Electrical Harness
-600A Fuse
-11
-10
-9
-8 350A 3
