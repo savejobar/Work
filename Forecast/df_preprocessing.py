@@ -1,21 +1,15 @@
 import re
-import os
-import ast
-from collections import defaultdict
 
-from typing import Optional, List, Iterable, Any, Dict, Set, Tuple
+
+from typing import Iterable, Any
 import numpy as np
 import pandas as pd
-import openpyxl
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-from openpyxl.utils import get_column_letter
-from statsmodels.tsa.holtwinters import ExponentialSmoothing
 import warnings
 
 warnings.filterwarnings('ignore')
 
 
-_ANALOG_SUFFIXES = (
+ANALOG_SUFFIXES = (
     "A", "А",           # латиница + кириллица
     "B", "C", "F", "K",
     "GT", "IN",
@@ -24,47 +18,14 @@ _ANALOG_SUFFIXES = (
     "-L1",
     " JR", " NSK",
 )
-_ANALOG_PREFIXES = (
+ANALOG_PREFIXES = (
     "W",      # WG0300002  → G0300002
     "AVX",    # AVX10X1125 → 10X1125
     "4Т-",    # 4Т-33006   → 33006
 )
 
 
-def load_repair_parts(file_csv: str, file_excel: str, skiprows: int = 9) -> pd.DataFrame | None:
-
-    try:
-        data = pd.read_csv(file_csv, skiprows=range(skiprows), dtype=str)
-        print(f"Файл успешно загружен из CSV: {file_csv}")
-        return data
-    except FileNotFoundError:
-        try:
-            data = pd.read_excel(file_excel, skiprows=range(skiprows), dtype=str)
-            print(f"Файл успешно загружен из Excel: {file_excel}")
-            return data
-        except FileNotFoundError:
-            print("Файлы не найдены. Проверьте путь к CSV и Excel.")
-            return None
-    except Exception as e:
-        print(f"Ошибка при чтении CSV: {e}")
-        return None
-    
-
-def extract_model_case_insensitive(machine: Optional[str], brand: Optional[str]) -> Optional[str]:
-
-    if pd.isna(machine) or pd.isna(brand):
-        return None
-
-    machine_lower = machine.lower()
-    brand_lower = brand.lower()
-    idx = machine_lower.find(brand_lower)
-    if idx == -1:
-        return None
-
-    return machine[idx + len(brand):].strip()
-
-
-def extract_articles(text: str, match_keys: Iterable[str]) -> List[str]:
+def extract_articles(text: str, match_keys: Iterable[str]) -> list[str]:
 
     # Преобразование паттерна LettersDigits/Digits в отдельные артикула
     text = re.sub(r'([A-Za-z]+)(\d+)/(\d+)', r'\1\2 \1\3', text)
@@ -75,7 +36,7 @@ def extract_articles(text: str, match_keys: Iterable[str]) -> List[str]:
     if 'ST40722' in text:
         return ['ST40722(1)', 'ST40722(2)']
 
-    found: List[str] = []
+    found: list[str] = []
     for key in match_keys:
         pattern = re.escape(key)
         if re.search(pattern, text):
@@ -110,7 +71,7 @@ def add_original_to_extended(row: pd.Series) -> str | None:
     return " ".join(extended_parts) if extended_parts else np.nan
 
 
-def find_all_analogs(start: Any, graph: Dict[Any, Set[Any]]) -> Tuple[Any, ...]:
+def find_all_analogs(start: Any, graph: dict[Any, set[Any]]) -> tuple[Any, ...]:
 
     visited = set()
     stack = [start]
@@ -301,14 +262,14 @@ def article_forms(val) -> list[str]:
     if stripped and stripped != base and stripped[0] not in "-/. _":
         forms.append(stripped)
 
-    for suf in _ANALOG_SUFFIXES:
+    for suf in ANALOG_SUFFIXES:
         s = suf.upper()
         if base.endswith(s) and len(base) > len(s):
             root = base[: -len(s)].rstrip()
             if root and root not in forms:
                 forms.append(root)
 
-    for pre in _ANALOG_PREFIXES:
+    for pre in ANALOG_PREFIXES:
         p = pre.upper()
         if base.startswith(p) and len(base) > len(p):
             root = base[len(p):].lstrip()
