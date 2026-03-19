@@ -53,16 +53,22 @@ def _run_pipeline(f1, f2) -> None:
 
     with st.spinner("Обрабатываем данные..."):
         try:
+            # Проверяем размер файлов
+            b1 = f1.getvalue()
+            b2 = f2.getvalue()
+            st.write(f"Размер repair.xlsx: {len(b1):,} байт")
+            st.write(f"Размер stock.xlsx: {len(b2):,} байт")
+
             with tempfile.TemporaryDirectory() as tmp:
                 p1 = os.path.join(tmp, "repair.xlsx")
                 p2 = os.path.join(tmp, "stock.xlsx")
 
-                with open(p1, "wb") as fh:   # ← внутри with tmp
-                    fh.write(f1.getvalue())
-                with open(p2, "wb") as fh:   # ← внутри with tmp
-                    fh.write(f2.getvalue())
+                with open(p1, "wb") as fh:
+                    fh.write(b1)
+                with open(p2, "wb") as fh:
+                    fh.write(b2)
 
-                df = run_full_pipeline(repair_path=p1, stock_path=p2)  # ← внутри with tmp
+                df = run_full_pipeline(repair_path=p1, stock_path=p2)
 
             st.session_state["df_main"] = df
             st.rerun()
