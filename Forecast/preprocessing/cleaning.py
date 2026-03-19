@@ -45,19 +45,21 @@ def _split_complects_repair(df: pd.DataFrame) -> pd.DataFrame:
     complects["Номенклатура.Артикул"] = complects["Номенклатура"].apply(
         lambda x: extract_articles(x, matches.keys())
     )
-    complects["Номенклатура.Артикул"] = complects["Номенклатура"].apply(
-        lambda x: extract_articles(x, matches.keys())
-    )
 
-    # ── ОТЛАДКА (удалить после исправления) ──────────────────────────────
-    import sys
+    # ── ОТЛАДКА ───────────────────────────────────────────────────────────
+    import streamlit as st
     counts = complects["Номенклатура.Артикул"].apply(len)
-    print(f"Всего комплектов: {len(complects)}", file=sys.stderr)
-    print(f"Дают 1 артикул: {(counts==1).sum()}", file=sys.stderr)
-    print(f"Дают 2 артикула: {(counts==2).sum()}", file=sys.stderr)
-    for _, row in complects[counts != 2].head(5).iterrows():
-        print(f"ПРОБЛЕМА: '{row['Номенклатура']}' → {row['Номенклатура.Артикул']}", file=sys.stderr)
-    print(f"matches keys: {list(matches.keys())}", file=sys.stderr)
+    st.session_state["_debug"] = {
+        "matches_count": len(matches),
+        "matches_keys": list(matches.keys()),
+        "complects_count": int(len(complects)),
+        "give_1": int((counts == 1).sum()),
+        "give_2": int((counts == 2).sum()),
+        "bad_examples": [
+            {"nom": row["Номенклатура"], "arts": row["Номенклатура.Артикул"]}
+            for _, row in complects[counts != 2].head(3).iterrows()
+        ]
+    }
     # ─────────────────────────────────────────────────────────────────────
 
 

@@ -72,6 +72,8 @@ def _run_pipeline(f1, f2) -> None:
 
             st.session_state["df_main"] = df
             st.rerun()
-
+            
         except Exception as e:
             st.error(f"Ошибка при обработке: {e}")
+            if "_debug" in st.session_state:
+                st.json(st.session_state["_debug"])
