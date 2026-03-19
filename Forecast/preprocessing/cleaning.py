@@ -46,23 +46,6 @@ def _split_complects_repair(df: pd.DataFrame) -> pd.DataFrame:
         lambda x: extract_articles(x, matches.keys())
     )
 
-    # ── ОТЛАДКА ───────────────────────────────────────────────────────────
-    import streamlit as st
-    counts = complects["Номенклатура.Артикул"].apply(len)
-    st.session_state["_debug"] = {
-        "matches_count": len(matches),
-        "matches_keys": list(matches.keys()),
-        "complects_count": int(len(complects)),
-        "give_1": int((counts == 1).sum()),
-        "give_2": int((counts == 2).sum()),
-        "bad_examples": [
-            {"nom": row["Номенклатура"], "arts": row["Номенклатура.Артикул"]}
-            for _, row in complects[counts != 2].head(3).iterrows()
-        ]
-    }
-    # ─────────────────────────────────────────────────────────────────────
-
-
     df_exploded = complects.explode("Номенклатура.Артикул").reset_index(drop=True)
     df_exploded["Номенклатура.Оригинальный номер"] = df_exploded[
         "Номенклатура.Артикул"
@@ -74,10 +57,13 @@ def _split_complects_repair(df: pd.DataFrame) -> pd.DataFrame:
     expected = complects.shape[0] * 2
     actual   = df_exploded.shape[0]
     if actual != expected:
+        # Временно — собираем детали в исключение
+        counts = complects["Номенклатура.Артикул"].apply(len)
+        bad = complects[counts != 2][["Номенклатура", "Номенклатура.Артикул"]].head(5)
         raise ValueError(
-            f"Ожидалось {expected} строк после explode комплектов (ремонт), "
-            f"получено {actual}. "
-            "Проверьте configs/matches.json и маски определения комплектов."
+            f"Ожидалось {expected} строк, получено {actual}. "
+            f"matches_count={len(matches)}. "
+            f"Проблемные: {bad.to_dict('records')}"
         )
 
     return pd.concat([df, df_exploded], ignore_index=True)
