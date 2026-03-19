@@ -17,5 +17,7 @@ def render_chart(result: GroupForecastResult, show_clean: bool = True) -> None:
     fig = plot_forecast(result, show_clean=show_clean, figsize=(14, 5))
     st.pyplot(fig, use_container_width=True)
     # Освобождаем память
+    import matplotlib
+    matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     plt.close(fig)

@@ -13,6 +13,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import matplotlib
+matplotlib.use("Agg")  # ← не-интерактивный бэкенд, работает без дисплея
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import numpy as np
