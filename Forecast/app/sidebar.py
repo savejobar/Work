@@ -49,20 +49,22 @@ def render_sidebar() -> pd.DataFrame | None:
 
 
 def _run_pipeline(f1, f2) -> None:
+    """Записывает файлы во временную папку и запускает run_full_pipeline."""
+    # Импорт здесь чтобы не замедлять старт приложения
     from pipeline.runner import run_full_pipeline
 
-    with st.spinner("Обрабатываем данные (~1-2 мин)..."):
+    with st.spinner("Обрабатываем данные..."):
         try:
-            # Фиксированные пути вместо временной папки
-            p1 = "/tmp/repair.xlsx"
-            p2 = "/tmp/stock.xlsx"
+            with tempfile.TemporaryDirectory() as tmp:
+                p1 = os.path.join(tmp, "repair.xlsx")
+                p2 = os.path.join(tmp, "stock.xlsx")
 
-            with open(p1, "wb") as fh:
-                fh.write(f1.getvalue())
-            with open(p2, "wb") as fh:
-                fh.write(f2.getvalue())
+                with open(p1, "wb") as fh:
+                    fh.write(f1.read())
+                with open(p2, "wb") as fh:
+                    fh.write(f2.read())
 
-            df = run_full_pipeline(repair_path=p1, stock_path=p2)
+                df = run_full_pipeline(repair_path=p1, stock_path=p2)
 
             st.session_state["df_main"] = df
             st.rerun()
