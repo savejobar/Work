@@ -6,7 +6,8 @@ app/main.py
 Запуск:
     streamlit run app/main.py
 """
-
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import streamlit as st
 
 st.set_page_config(
