@@ -45,6 +45,22 @@ def _split_complects_repair(df: pd.DataFrame) -> pd.DataFrame:
     complects["Номенклатура.Артикул"] = complects["Номенклатура"].apply(
         lambda x: extract_articles(x, matches.keys())
     )
+    complects["Номенклатура.Артикул"] = complects["Номенклатура"].apply(
+        lambda x: extract_articles(x, matches.keys())
+    )
+
+    # ── ОТЛАДКА (удалить после исправления) ──────────────────────────────
+    import sys
+    counts = complects["Номенклатура.Артикул"].apply(len)
+    print(f"Всего комплектов: {len(complects)}", file=sys.stderr)
+    print(f"Дают 1 артикул: {(counts==1).sum()}", file=sys.stderr)
+    print(f"Дают 2 артикула: {(counts==2).sum()}", file=sys.stderr)
+    for _, row in complects[counts != 2].head(5).iterrows():
+        print(f"ПРОБЛЕМА: '{row['Номенклатура']}' → {row['Номенклатура.Артикул']}", file=sys.stderr)
+    print(f"matches keys: {list(matches.keys())}", file=sys.stderr)
+    # ─────────────────────────────────────────────────────────────────────
+
+
     df_exploded = complects.explode("Номенклатура.Артикул").reset_index(drop=True)
     df_exploded["Номенклатура.Оригинальный номер"] = df_exploded[
         "Номенклатура.Артикул"
