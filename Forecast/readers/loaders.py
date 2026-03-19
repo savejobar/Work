@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 
 
-_CONFIG_DIR = "configs"
+_CONFIG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "configs")
 
 
 def load_config(file_name: str) -> dict:
