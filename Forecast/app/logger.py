@@ -10,14 +10,10 @@ def _get_user() -> str:
     Возвращает email пользователя или уникальный ID сессии.
     """
     try:
-        if hasattr(st, "user") and st.user and st.user.is_logged_in:
-            user_id = (
-                getattr(st.user, "email", None)
-                or getattr(st.user, "id", None)
-                or getattr(st.user, "username", None)
-            )
-            if user_id:
-                return user_id
+        if hasattr(st, "user") and st.user.is_logged_in:
+            email = st.user.email
+            if email:
+                return email
     except AttributeError:
         pass
     if "session_id" not in st.session_state:
