@@ -63,14 +63,15 @@ def _get_console_logger() -> logging.Logger:
 
 
 def _write_log(level: str, message: str, user: str) -> None:
-    print(f"DEBUG _write_log called: {level} | {user} | {message}")  # ← добавь
     try:
         sheet = _get_sheet()
-        print(f"DEBUG sheet obtained: {sheet}")  # ← добавь
-        sheet.append_row([...])
-        print("DEBUG append_row success")  # ← добавь
+        sheet.append_row([
+            datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
+            user,
+            level,
+            message,
+        ])
     except Exception as e:
-        print(f"DEBUG exception: {e}")  # ← добавь
         _get_console_logger().error(f"Logging failed: {e}")
 
 
