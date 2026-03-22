@@ -35,12 +35,13 @@ def _get_sheet():
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive",
     ]
-    creds = Credentials.from_service_account_info(
-        st.secrets["gcp_service_account"],
-        scopes=scopes,
-    )
+    # Читаем secrets в основном потоке и передаём напрямую
+    service_account_info = dict(st.secrets["gcp_service_account"])
+    sheet_id = st.secrets["google_sheet_id"]
+
+    creds = Credentials.from_service_account_info(service_account_info, scopes=scopes)
     client = gspread.authorize(creds)
-    return client.open_by_key(st.secrets["google_sheet_id"]).sheet1
+    return client.open_by_key(sheet_id).sheet1
 
 
 def _get_console_logger() -> logging.Logger:
