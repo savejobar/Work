@@ -107,9 +107,9 @@ def render_params() -> tuple[int, float, float, bool]:
             "IQR ×", min_value=1.0, max_value=5.0, value=1.5, step=0.1,
             help="Определяет чувствительность к выбросам. Малое значение — больше точек удаляется. Влияет на стабильность прогноза."
         )
-        no_outliers = st.toggle("Не удалять выбросы", value=False)
+        no_outliers = st.toggle("Не удалять выбросы", value=True)
         if no_outliers:
-            iqr_factor = float("inf")  # порог бесконечный → ничего не срабатывает
+            iqr_factor = float("inf") 
     with col3:
         croston_threshold = st.slider(
             "Порог нулей для TSB", min_value=0.1, max_value=0.8,
