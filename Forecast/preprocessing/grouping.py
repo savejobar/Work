@@ -4,7 +4,7 @@ from typing import Any
 
 import pandas as pd
 
-from preprocessing.normalization import article_forms, normalize
+from preprocessing.normalization import article_forms
 
 
 def find_all_analogs(
@@ -13,12 +13,9 @@ def find_all_analogs(
 ) -> tuple[Any, ...]:
     """
     Обход в глубину по графу аналогов начиная с узла start.
-
-    Returns:
-        Отсортированный кортеж всех достижимых узлов (включая start).
     """
-    visited: set = set()
-    stack: list  = [start]
+    visited = set()
+    stack = [start]
 
     while stack:
         node = stack.pop()
@@ -36,13 +33,6 @@ def build_analog_graph(df: pd.DataFrame) -> defaultdict[str, set[str]]:
     Рёбра соединяют:
       - разные формы одного артикула (с суффиксом/префиксом и без);
       - артикул и каждый из его аналогов из колонки «Аналоги».
-
-    Args:
-        df: DataFrame с колонками «Номенклатура.Артикул» и «Аналоги»
-            (список строк-аналогов на каждую строку).
-
-    Returns:
-        defaultdict: граф смежности {артикул: {связанный_артикул, ...}}.
     """
     graph: defaultdict[str, set[str]] = defaultdict(set)
 
@@ -56,7 +46,7 @@ def build_analog_graph(df: pd.DataFrame) -> defaultdict[str, set[str]]:
                 graph[pf_j].add(pf_i)
 
         # связываем с аналогами
-        for analog_raw in row.get("Аналоги", []) or []:
+        for analog_raw in (row["Аналоги"] or []):
             for af in article_forms(analog_raw):
                 for pf in part_forms:
                     if pf != af:
@@ -74,8 +64,6 @@ def normalize_analog_lists(
     """
     Для каждой группы выбирает самый длинный кортеж аналогов
     и проставляет его всем строкам группы.
-
-    Использует vectorized map вместо apply(axis=1).
     """
     df = df.copy()
 
@@ -100,12 +88,10 @@ def consolidate_extended_article_numbers(row: pd.Series) -> str | None:
     """
     Объединяет основной, оригинальный и расширенный номера запчасти
     в единую строку через пробел. Возвращает None если результат пустой.
-
-    Используется как apply-функция на строках DataFrame ремонтов.
     """
     main_art = str(row["Номенклатура.Артикул"]).strip().upper()
-    extended = row.get("Номенклатура.Оригинальный номер расширенный")
-    original = row.get("Номенклатура.Оригинальный номер")
+    extended = row["Номенклатура.Оригинальный номер расширенный"]
+    original = row["Номенклатура.Оригинальный номер"]
 
     extended_parts: list[str] = []
     if pd.notna(extended) and str(extended).strip():

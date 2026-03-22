@@ -9,7 +9,6 @@ from features.aggregation import (
     calculate_external_sales,
     fill_missing_months,
 )
-from readers.loaders import preprocess_repair_parts, preprocess_stock_report
 from preprocessing.cleaning import (
     normalize_nomenclatures_repair_parts,
     normalize_nomenclatures_stock_report,
@@ -21,7 +20,7 @@ from preprocessing.grouping import (
     normalize_analog_lists,
 )
 from preprocessing.normalization import article_forms, normalize
-
+from readers.loaders import preprocess_repair_parts, preprocess_stock_report
 
 
 def _build_article_lookup(
@@ -30,28 +29,25 @@ def _build_article_lookup(
     """
     Строит два словаря для быстрого поиска группы и списка аналогов
     по нормализованному артикулу.
-
-    Returns:
-        (article_to_group, article_to_analogs)
     """
-    article_to_group:   dict[str, int]   = {}
-    article_to_analogs: dict[str, tuple] = {}
+    article_to_group = {}
+    article_to_analogs = {}
 
     for _, row in df1.drop_duplicates("Номенклатура.Артикул").iterrows():
         group = row["Номер группы"]
-        raw   = row["all_analogs"]
+        raw = row["all_analogs"]
         try:
             analogs = raw if isinstance(raw, tuple) else ast.literal_eval(raw)
         except (ValueError, SyntaxError):
             analogs = ()
 
         for art in analogs:
-            article_to_group[art]   = group
+            article_to_group[art] = group
             article_to_analogs[art] = analogs
 
         main = row["Номенклатура.Артикул"]
         if pd.notna(main) and main:
-            article_to_group[main]   = group
+            article_to_group[main] = group
             article_to_analogs[main] = analogs
 
     return article_to_group, article_to_analogs
@@ -84,7 +80,7 @@ def _enrich_analogs(
     Добавляет артикул из df2 в список аналогов группы,
     если его ещё нет ни в аналогах, ни в article_to_group.
     """
-    art     = row["Артикул"]
+    art = row["Артикул"]
     analogs = row["Список аналогов"]
     if pd.isnull(art) or not isinstance(analogs, tuple):
         return analogs
@@ -96,22 +92,11 @@ def _enrich_analogs(
 def run_full_pipeline(
     repair_path: str,
     stock_path: str,
-    skiprows: int = 8,
 ) -> pd.DataFrame:
     """
     Полный ETL-пайплайн: загрузка → нормализация → группировка → агрегация.
-
-    Args:
-        repair_path: Путь к «Запчасти списанные в ремонт.xlsx».
-        stock_path:  Путь к «Остатки и обороты.xlsx».
-        skiprows:    Количество пропускаемых строк в Excel (по умолчанию 8).
-
-    Returns:
-        DataFrame с колонками: Год, Месяц, Номер группы, Продажа, Ремонт,
-        Приход, Конечный остаток, метаданные, is_synthetic.
     """
-
-    df1 = preprocess_repair_parts(repair_path, skiprows)
+    df1 = preprocess_repair_parts(repair_path)
     df1 = normalize_nomenclatures_repair_parts(df1)
 
     for col in [
@@ -144,10 +129,10 @@ def run_full_pipeline(
     df1["Номер группы"] = df1["all_analogs"].map(group_mapping)
     df_quarter = aggregate_repair_groups(df1)
 
-    df2 = preprocess_stock_report(stock_path, skiprows)
+    df2 = preprocess_stock_report(stock_path)
     df2 = normalize_nomenclatures_stock_report(df2)
 
-    df2["Артикул"]            = df2["Артикул"].apply(normalize)
+    df2["Артикул"] = df2["Артикул"].apply(normalize)
     df2["Оригинальный номер"] = df2["Оригинальный номер"].apply(normalize)
 
     article_to_group, article_to_analogs = _build_article_lookup(df1)
@@ -161,7 +146,7 @@ def run_full_pipeline(
             axis=1,
         )
     )
-    df2["Номер группы"]    = groups
+    df2["Номер группы"] = groups
     df2["Список аналогов"] = analogs_list
 
     df2["Список аналогов"] = df2.apply(
@@ -169,10 +154,12 @@ def run_full_pipeline(
     )
     df2 = normalize_analog_lists(df2)
 
-    graph_new: defaultdict[str, set[str]] = defaultdict(set)
+    graph_new = defaultdict(set)
 
-    for idx in df2[df2["Номер группы"].isna()].index:
-        art  = normalize(df2.at[idx, "Артикул"])
+    unmatched_idx = df2[df2["Номер группы"].isna()].index
+
+    for idx in unmatched_idx:
+        art = normalize(df2.at[idx, "Артикул"])
         orig = normalize(df2.at[idx, "Оригинальный номер"])
 
         if art is None:
@@ -231,8 +218,8 @@ def run_full_pipeline(
         for i in df2_group_idx.get(grp, []):
             df2.at[i, "Список аналогов"] = new_analogs
 
-    for idx in df2[df2["Номер группы"].isna()].index:
-        art  = normalize(df2.at[idx, "Артикул"])
+    for idx in unmatched_idx:
+        art = normalize(df2.at[idx, "Артикул"])
         orig = normalize(df2.at[idx, "Оригинальный номер"])
         if art is None:
             art = orig
@@ -245,9 +232,9 @@ def run_full_pipeline(
             find_all_analogs(art, graph_new) if art is not None else tuple()
         )
 
-    unique_new      = df2.loc[df2["Номер группы"].isna(), "Список аналогов"].drop_duplicates()
+    unique_new = df2.loc[df2["Номер группы"].isna(), "Список аналогов"].drop_duplicates()
     new_group_start = int(df1["Номер группы"].max()) + 1
-    new_group_map   = {
+    new_group_map = {
         grp: new_group_start + i
         for i, grp in enumerate(unique_new)
     }
@@ -284,9 +271,9 @@ def run_full_pipeline(
 
     meta_order = [
         c for c in final.columns
-        if c not in ["Продажа", "Ремонт", "Приход", "Конечный остаток"]
+        if c not in ["Продажа", "Ремонт", "Конечный остаток"]
     ]
-    final = final[meta_order + ["Приход", "Конечный остаток", "Продажа", "Ремонт"]]
+    final = final[meta_order + ["Конечный остаток", "Продажа", "Ремонт"]]
 
     final = normalize_analog_lists(
         final, col_group="Номер группы", col_analogs="Список аналогов"
@@ -298,7 +285,6 @@ def run_full_pipeline(
     )
     final["Номенклатура"] = final["Номер группы"].map(name_map)
 
-    # ── Шаг 5. Заполнение пропущенных месяцев 
     df = fill_missing_months(final)
 
     return df

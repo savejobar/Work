@@ -16,13 +16,6 @@ def apply_corrections(df: pd.DataFrame, source: str) -> pd.DataFrame:
                            саму строку и применяется последним.
 
     Значение null в JSON → NaN в DataFrame.
-
-    Args:
-        df:     Исходный DataFrame. Не изменяется (работаем с копией).
-        source: «repair» или «stock» — определяет имя конфига.
-
-    Returns:
-        Копия df с применёнными правками.
     """
     corrections = load_config(f"corrections_{source}.json")
     if not corrections:
@@ -33,12 +26,12 @@ def apply_corrections(df: pd.DataFrame, source: str) -> pd.DataFrame:
     nom_col = "Номенклатура"
     art_col = "Артикул" if source == "stock" else "Номенклатура.Артикул"
 
-    # ── 1. Переименование значений артикула ───────────────────────────────
+    # Переименование значений артикула
     article_remap: dict[str, str] = corrections.get("article_remap", {})
     if article_remap and art_col in df.columns:
         df[art_col] = df[art_col].replace(article_remap)
 
-    # ── 2. Правки по значению Артикула ────────────────────────────────────
+    # Правки по значению Артикула
     for art_val, overrides in corrections.get("by_article", {}).items():
         if art_col not in df.columns:
             break
@@ -48,7 +41,7 @@ def apply_corrections(df: pd.DataFrame, source: str) -> pd.DataFrame:
         for col, value in overrides.items():
             df.loc[mask, col] = value if value is not None else np.nan
 
-    # ── 3. Правки по значению Номенклатуры ───────────────────────────────
+    # Правки по значению Номенклатуры
     for nom_val, overrides in corrections.get("by_nomenclature", {}).items():
         mask = df[nom_col] == nom_val
         if not mask.any():

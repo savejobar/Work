@@ -5,18 +5,20 @@ from preprocessing.corrections import apply_corrections
 from preprocessing.normalization import extract_articles
 
 
-# ── Внутренние функции разбивки комплектов ────────────────────────────────────
-
-def _split_complects_repair(df: pd.DataFrame) -> pd.DataFrame:
+def _split_complects(
+        df: pd.DataFrame,
+        art_col: str,
+        orig_col: str,
+        ext_col: str | None = None,
+) -> pd.DataFrame:
     """
-    Находит строки-комплекты в df1 (ремонт), взрывает их в отдельные артикулы
+    Находит строки-комплекты, разбивает их на отдельные артикулы
     и возвращает объединённый DataFrame.
 
-    Комплект — строка, где в Номенклатуре перечислено несколько артикулов
-    (через «+», специальные паттерны и т.д.).
-
-    Raises:
-        ValueError: если после explode количество строк не соответствует ожидаемому.
+    Комплект — строка номенклатуры содержащая '+' или совпадающая
+    со специальными масками (ST40111/40110, сдвоенные фильтры и т.д.).
+    Каждый комплект взрывается ровно в 2 строки через explode —
+    если это не так, выбрасывается ValueError.
     """
     matches = get_matches()
 
@@ -25,67 +27,10 @@ def _split_complects_repair(df: pd.DataFrame) -> pd.DataFrame:
         & ~df["Номенклатура"].str.contains(
             r"^(?:Колесо|РВД|[Оо]богреватель|Контроллер|Deutz"
             r"|Выключатель|Батарея|Рукав"
-            r"|Фильтр воздушный к-кт \(внутр\.\+внешн\.\) 1351230502)",
-            na=False,
-        )
-    )
-    mask_st_units = df["Номенклатура"].str.contains(
-        r"Фильтр воздушный ST40111/40110", case=False, na=False
-    )
-    mask_brackets = df["Номенклатура"].str.contains(
-        r"(95*165*340/70*90*335,", case=False, na=False, regex=False
-    )
-    mask_hid = df["Номенклатура"].str.contains(
-        r"Фильтр воздушный ST40111ST40110", case=False, na=False
-    )
-
-    complects = df[mask_plus | mask_st_units | mask_brackets | mask_hid].copy()
-    df        = df[~df.index.isin(complects.index)]
-
-    complects["Номенклатура.Артикул"] = complects["Номенклатура"].apply(
-        lambda x: extract_articles(x, matches.keys())
-    )
-
-    df_exploded = complects.explode("Номенклатура.Артикул").reset_index(drop=True)
-    df_exploded["Номенклатура.Оригинальный номер"] = df_exploded[
-        "Номенклатура.Артикул"
-    ].map(lambda x: matches[x].split()[0] if x in matches else None)
-    df_exploded["Номенклатура.Оригинальный номер расширенный"] = df_exploded[
-        "Номенклатура.Артикул"
-    ].map(matches)
-
-    expected = complects.shape[0] * 2
-    actual   = df_exploded.shape[0]
-    if actual != expected:
-        # Временно — собираем детали в исключение
-        counts = complects["Номенклатура.Артикул"].apply(len)
-        bad = complects[counts != 2][["Номенклатура", "Номенклатура.Артикул"]].head(5)
-        raise ValueError(
-            f"Ожидалось {expected} строк, получено {actual}. "
-            f"matches_count={len(matches)}. "
-            f"Проблемные: {bad.to_dict('records')}"
-        )
-
-    return pd.concat([df, df_exploded], ignore_index=True)
-
-
-def _split_complects_stock(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Находит строки-комплекты в df2 (склад), взрывает их в отдельные артикулы
-    и возвращает объединённый DataFrame.
-
-    Raises:
-        ValueError: если после explode количество строк не соответствует ожидаемому.
-    """
-    matches = get_matches()
-
-    mask_plus = (
-        df["Номенклатура"].str.contains(r"\+", na=False)
-        & ~df["Номенклатура"].str.contains(
-            r"^(Колесо|РВД|[Оо]богреватель|Распределитель|Насос|Комплект"
-            r"|Кабель|Гидроцилиндр|Датчик|Коллектор"
+            r"|Распределитель|Насос|Комплект|Кабель|Гидроцилиндр|Датчик|Коллектор"
             r"|Фильтр топливный PERKINS"
-            r"|Фильтр воздушный \(внешний\+внутренний\) A5541S)",
+            r"|Фильтр воздушный \(внешний\+внутренний\) A5541S"
+            r"|Фильтр воздушный к-кт \(внутр\.\+внешн\.\) 1351230502)",
             na=False,
         )
     )
@@ -102,44 +47,33 @@ def _split_complects_stock(df: pd.DataFrame) -> pd.DataFrame:
         r"Фильтр воздушный 6666375/6666376", case=False, na=False
     )
 
-    complects = df[
-        mask_plus | mask_st_units | mask_brackets | mask_hid | mask_filter
-    ].copy()
+    complects = df[mask_plus | mask_st_units | mask_brackets | mask_hid | mask_filter].copy()
     df = df[~df.index.isin(complects.index)]
 
-    complects["Артикул"] = complects["Номенклатура"].apply(
+    complects[art_col] = complects["Номенклатура"].apply(
         lambda x: extract_articles(x, matches.keys())
     )
-    df_exploded = complects.explode("Артикул").reset_index(drop=True)
-    df_exploded["Оригинальный номер"] = df_exploded["Артикул"].map(
+    df_exploded = complects.explode(art_col).reset_index(drop=True)
+    df_exploded[orig_col] = df_exploded[art_col].map(
         lambda x: matches[x].split()[0] if x in matches else None
     )
+    if ext_col:
+        df_exploded[ext_col] = df_exploded[art_col].map(matches)
 
     expected = complects.shape[0] * 2
-    actual   = df_exploded.shape[0]
+    actual = df_exploded.shape[0]
     if actual != expected:
         raise ValueError(
-            f"Ожидалось {expected} строк после explode комплектов (склад), "
-            f"получено {actual}. "
+            f"Ожидалось {expected} строк после explode комплектов, получено {actual}. "
             "Проверьте configs/matches.json и маски определения комплектов."
         )
 
     return pd.concat([df, df_exploded], ignore_index=True)
 
 
-# ── Публичные функции ─────────────────────────────────────────────────────────
-
 def normalize_nomenclatures_repair_parts(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Очищает и нормализует справочник номенклатуры в DataFrame ремонтов.
-
-    Порядок операций:
-      1. Применяет правки из configs/corrections_repair.json.
-      2. Убирает префикс «DIFA» и лишние пробелы.
-      3. Разбивает строки-комплекты на отдельные артикулы.
-
-    Returns:
-        Очищенный DataFrame.
+    Нормализует номенклатуру в DataFrame ремонтов.
     """
     df = apply_corrections(df, source="repair")
 
@@ -148,41 +82,41 @@ def normalize_nomenclatures_repair_parts(df: pd.DataFrame) -> pd.DataFrame:
         "Номенклатура.Оригинальный номер",
         "Номенклатура.Оригинальный номер расширенный",
     ]
-    df[cols] = df[cols].replace(r"DIFA\s*", "", regex=True)
     df[cols] = (
         df[cols]
+        .replace(r"DIFA\s*", "", regex=True)
         .replace(r"\s+", " ", regex=True)
         .apply(lambda x: x.str.strip())
     )
 
-    df = _split_complects_repair(df)
+    df = _split_complects(
+        df,
+        art_col="Номенклатура.Артикул",
+        orig_col="Номенклатура.Оригинальный номер",
+        ext_col="Номенклатура.Оригинальный номер расширенный",
+    )
+
     return df
 
 
 def normalize_nomenclatures_stock_report(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Очищает и нормализует справочник номенклатуры в DataFrame склада.
-
-    Порядок операций:
-      1. Применяет правки из configs/corrections_stock.json.
-      2. Убирает префикс «DIFA» и лишние пробелы.
-      3. Разбивает строки-комплекты на отдельные артикулы.
-
-    Важно: corrections применяются ДО вычисления масок комплектов —
-    переименованные строки корректно попадают в нужные маски.
-
-    Returns:
-        Очищенный DataFrame.
+    Нормализует номенклатуру в DataFrame склада.
     """
     df = apply_corrections(df, source="stock")
 
     cols = ["Артикул", "Оригинальный номер"]
-    df[cols] = df[cols].replace(r"DIFA\s*", "", regex=True)
     df[cols] = (
         df[cols]
+        .replace(r"DIFA\s*", "", regex=True)
         .replace(r"\s+", " ", regex=True)
         .apply(lambda x: x.str.strip())
     )
 
-    df = _split_complects_stock(df)
+    df = _split_complects(
+        df,
+        art_col="Артикул",
+        orig_col="Оригинальный номер",
+    )
+
     return df

@@ -1,47 +1,29 @@
-"""
-forecasting/models.py
-======================
-Модели прогнозирования спроса на запасные части.
-
-Логика выбора метода:
-    1. zero_ratio > CROSTON_THRESHOLD  → Croston (TSB-модификация)
-    2. История >= 24 мес.              → кандидаты включают Holt-Winters (сезонность)
-    3. История 12–23 мес.             → только Holt и простой ETS
-    4. История < 12 мес.              → Mean-6m как запасной
-
-Все коэффициенты подбираются автоматически через optimized=True (L-BFGS-B).
-"""
-
-from __future__ import annotations
-
 import warnings
+import logging
 from dataclasses import dataclass, field
 
 import numpy as np
 import pandas as pd
 
-# ── Константы ─────────────────────────────────────────────────────────────────
 
-CROSTON_THRESHOLD: float = 0.40   # доля нулей выше которой применяем Croston/TSB
-CROSTON_ALPHA: float     = 0.1    # начальный alpha для Croston (переопределяется оптимизацией)
-MIN_SEASONAL_OBS: int    = 24     # минимум наблюдений для сезонной модели (2 сезона × 12)
-MIN_HOLT_OBS: int        = 4      # минимум для Holt
+CROSTON_THRESHOLD = 0.40
+CROSTON_ALPHA = 0.1
+MIN_SEASONAL_OBS = 24
+MIN_HOLT_OBS = 4
 
-
-# ── Вспомогательные типы ──────────────────────────────────────────────────────
 
 @dataclass
 class ForecastResult:
-    """Результат прогноза одной серии."""
-    forecast:     pd.Series          # прогнозные значения с DatetimeIndex
-    method:       str                 # название метода
-    aic:          float | None = None # AIC лучшей модели (если применимо)
-    outliers:     list  = field(default_factory=list)
-    series_raw:   pd.Series | None = None
+    """
+    Результат прогноза одной серии.
+    """
+    forecast: pd.Series # прогнозные значения с DatetimeIndex
+    method: str # название метода
+    aic: float | None = None # AIC лучшей модели (если применимо)
+    outliers: list = field(default_factory=list)
+    series_raw: pd.Series | None = None
     series_clean: pd.Series | None = None
 
-
-# ── Утилиты (переиспользуем логику из app.py) ─────────────────────────────────
 
 def remove_outliers_local(
     series: pd.Series,
@@ -49,20 +31,17 @@ def remove_outliers_local(
 ) -> tuple[pd.Series, list[dict]]:
     """
     Заменяет выбросы (значения выше Q3 + iqr_factor*IQR) медианой соседей.
-
-    Returns:
-        (очищенная серия, лог выбросов)
     """
     s = series.copy()
     q1, q3 = s.quantile(0.25), s.quantile(0.75)
-    iqr    = q3 - q1
-    upper  = q3 + iqr_factor * iqr
-    mask   = s > upper
+    iqr = q3 - q1
+    upper = q3 + iqr_factor * iqr
+    mask = s > upper
     log: list[dict] = []
 
     for idx in s[mask].index:
         orig = s[idx]
-        pos  = s.index.get_loc(idx)
+        pos = s.index.get_loc(idx)
         nbrs = [
             s.iloc[pos + off]
             for off in [-3, -2, -1, 1, 2, 3]
@@ -71,10 +50,10 @@ def remove_outliers_local(
         repl = float(np.median(nbrs)) if nbrs else float(s.median())
         s.iloc[pos] = repl
         log.append({
-            "date":        idx.strftime("%Y-%m"),
-            "original":    round(float(orig), 1),
+            "date": idx.strftime("%Y-%m"),
+            "original": round(float(orig), 1),
             "replacement": round(repl, 1),
-            "threshold":   round(float(upper), 1),
+            "threshold": round(float(upper), 1),
         })
 
     return s, log
@@ -87,12 +66,11 @@ def _tsb_forecast(
 ) -> tuple[pd.Series, str]:
     """
     TSB (Teunter-Syntetos-Babai) — модификация Кростона с оптимизацией alpha.
-
     Минимизирует MSE по сетке alpha ∈ [0.05, 0.50].
     Возвращает лучший прогноз и название метода.
     """
     vals = series.values
-    nz   = [(i, v) for i, v in enumerate(vals) if v > 0]
+    nz = [(i, v) for i, v in enumerate(vals) if v > 0]
 
     if not nz:
         return pd.Series([0.0] * steps, index=fc_index), "Croston"
@@ -109,24 +87,24 @@ def _tsb_forecast(
         for i2, v2 in nz[1:]:
             pred = z / p if p > 0 else 0.0
             errors.append((v2 - pred) ** 2)
-            z    = alpha * v2 + (1 - alpha) * z
-            p    = alpha * (i2 - prev) + (1 - alpha) * p
+            z = alpha * v2 + (1 - alpha) * z
+            p = alpha * (i2 - prev) + (1 - alpha) * p
             prev = i2
 
         mse = float(np.mean(errors)) if errors else np.inf
         if mse < best_mse:
-            best_mse   = mse
+            best_mse = mse
             best_alpha = alpha
 
     # Финальный расчёт с лучшим alpha
     alpha = best_alpha
-    z     = float(nz[0][1])
-    p     = float(nz[0][0] + 1)
-    prev  = nz[0][0]
+    z = float(nz[0][1])
+    p = float(nz[0][0] + 1)
+    prev = nz[0][0]
 
     for i2, v2 in nz[1:]:
-        z    = alpha * v2 + (1 - alpha) * z
-        p    = alpha * (i2 - prev) + (1 - alpha) * p
+        z = alpha * v2 + (1 - alpha) * z
+        p = alpha * (i2 - prev) + (1 - alpha) * p
         prev = i2
 
     fc_val = max(0.0, round(z / p, 2)) if p > 0 else 0.0
@@ -148,7 +126,7 @@ def _ets_forecast(
         >= 4 мес  → Holt и простой ETS
         < 4 мес   → Mean-6m
     """
-    from statsmodels.tsa.holtwinters import ExponentialSmoothing as ETS  # noqa: N811
+    from statsmodels.tsa.holtwinters import ExponentialSmoothing as ETS
 
     has_zeros = (series == 0).any()
 
@@ -166,9 +144,9 @@ def _ets_forecast(
         candidates.append(("add", None, None, "Holt"))
         candidates.append((None, None, None, "ETS"))
 
-    best_fc:   pd.Series | None = None
-    best_aic:  float            = np.inf
-    best_name: str              = "Mean-6m"
+    best_fc: pd.Series | None = None
+    best_aic: float = np.inf
+    best_name: str = "Mean-6m"
 
     for trend, seasonal, sp, name in candidates:
         if sp and n_obs < 2 * sp:
@@ -176,28 +154,26 @@ def _ets_forecast(
         try:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                model   = ETS(series, trend=trend, seasonal=seasonal, seasonal_periods=sp)
-                fitted  = model.fit(optimized=True)
+                model = ETS(series, trend=trend, seasonal=seasonal, seasonal_periods=sp)
+                fitted = model.fit(optimized=True)
                 if fitted.aic < best_aic:
-                    best_aic  = fitted.aic
-                    best_fc   = fitted.forecast(steps).clip(lower=0).round(2)
+                    best_aic = fitted.aic
+                    best_fc = fitted.forecast(steps).clip(lower=0).round(2)
                     best_name = name
-        except Exception:
-            pass
+        except Exception as e:
+            logging.warning(f"{name} failed: {e}")
 
     if best_fc is None:
         # Запасной вариант — среднее последних 6 месяцев
-        val    = max(0.0, round(float(series.tail(6).mean()), 2))
-        best_fc   = pd.Series([val] * steps, index=fc_index)
-        best_aic  = None
+        val = max(0.0, round(float(series.tail(6).mean()), 2))
+        best_fc = pd.Series([val] * steps, index=fc_index)
+        best_aic = None
         best_name = "Mean-6m"
     else:
         best_fc.index = fc_index
 
     return best_fc, best_name, best_aic if best_aic != np.inf else None
 
-
-# ── Основная функция прогноза ─────────────────────────────────────────────────
 
 def forecast_series(
     series: pd.Series,
@@ -213,24 +189,14 @@ def forecast_series(
         1. Очищает выбросы через IQR (iqr_factor регулирует чувствительность).
         2. Если доля нулей > croston_threshold → TSB (модификация Кростона).
         3. Иначе → лучшая ETS/Holt-Winters по AIC.
-
-    Args:
-        series:             Временной ряд с DatetimeIndex, freq='MS'.
-        steps:              Горизонт прогноза (1–12 месяцев).
-        fc_start_date:      Дата начала прогноза.
-        iqr_factor:         Множитель IQR для порога выбросов (чем выше — мягче).
-        croston_threshold:  Порог доли нулей для переключения на TSB/Croston.
-
-    Returns:
-        ForecastResult с прогнозом на очищенных данных.
     """
-    s_raw  = series.clip(lower=0)
-    n_obs  = len(s_raw)
+    s_raw = series.clip(lower=0)
+    n_obs = len(s_raw)
 
     # Очистка выбросов
     s_clean, outliers = remove_outliers_local(s_raw, iqr_factor)
 
-    fc_index   = pd.date_range(fc_start_date, periods=steps, freq="MS")
+    fc_index = pd.date_range(fc_start_date, periods=steps, freq="MS")
     zero_ratio = (s_clean == 0).sum() / max(n_obs, 1)
 
     if zero_ratio > croston_threshold:
@@ -240,10 +206,10 @@ def forecast_series(
         forecast, method, aic = _ets_forecast(s_clean, steps, fc_index, n_obs)
 
     return ForecastResult(
-        forecast     = forecast,
-        method       = method,
-        aic          = aic,
-        outliers     = outliers,
-        series_raw   = s_raw,
-        series_clean = s_clean,
+        forecast=forecast,
+        method=method,
+        aic=aic,
+        outliers=outliers,
+        series_raw=s_raw,
+        series_clean=s_clean,
     )
