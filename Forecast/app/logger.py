@@ -1,7 +1,6 @@
 import logging
 import uuid
 from datetime import datetime, timezone
-import threading
 
 import streamlit as st
 
@@ -25,6 +24,7 @@ def _get_user() -> str:
         st.session_state["session_id"] = str(uuid.uuid4())
     return st.session_state["session_id"]
 
+
 @st.cache_resource(ttl=3600)
 def _get_sheet():
     """
@@ -37,13 +37,12 @@ def _get_sheet():
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive",
     ]
-    # Читаем secrets в основном потоке и передаём напрямую
-    service_account_info = dict(st.secrets["gcp_service_account"])
-    sheet_id = st.secrets["google_sheet_id"]
-
-    creds = Credentials.from_service_account_info(service_account_info, scopes=scopes)
+    creds = Credentials.from_service_account_info(
+        st.secrets["gcp_service_account"],
+        scopes=scopes,
+    )
     client = gspread.authorize(creds)
-    return client.open_by_key(sheet_id).sheet1
+    return client.open_by_key(st.secrets["google_sheet_id"]).sheet1
 
 
 def _get_console_logger() -> logging.Logger:
@@ -55,24 +54,12 @@ def _get_console_logger() -> logging.Logger:
         logger.setLevel(logging.INFO)
         logger.propagate = False
         handler = logging.StreamHandler()
-
         handler.setFormatter(logging.Formatter(
             "%(asctime)s | %(levelname)s | %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",
         ))
         logger.addHandler(handler)
     return logger
-
-
-def _write_log_async(level: str, message: str, user: str) -> None:
-    """
-    Асинхронная запись лога — не блокирует UI.
-    """
-    threading.Thread(
-        target=_write_log,
-        args=(level, message, user),
-        daemon=True,
-    ).start()
 
 
 def _write_log(level: str, message: str, user: str) -> None:
@@ -88,25 +75,25 @@ def _write_log(level: str, message: str, user: str) -> None:
             message,
         ])
     except Exception as e:
-        _get_console_logger().error(f"Logging failed: {e}")  # ← не теряем ошибки
+        _get_console_logger().error(f"Logging failed: {e}")
 
 
 class SessionLogger:
     """
-    Логгер который пишет в консоль синхронно и в Google Sheets асинхронно.
+    Логгер который пишет в консоль и в Google Sheets.
     """
 
     def info(self, msg: str) -> None:
         user = _get_user()
         _get_console_logger().info(f"{user} | {msg}")
-        _write_log_async("INFO", msg, user)
+        _write_log("INFO", msg, user)
 
     def warning(self, msg: str) -> None:
         user = _get_user()
         _get_console_logger().warning(f"{user} | {msg}")
-        _write_log_async("WARNING", msg, user)
+        _write_log("WARNING", msg, user)
 
     def error(self, msg: str) -> None:
         user = _get_user()
         _get_console_logger().error(f"{user} | {msg}")
-        _write_log_async("ERROR", msg, user)
+        _write_log("ERROR", msg, user)
