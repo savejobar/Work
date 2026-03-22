@@ -95,9 +95,9 @@ if "forecast_results" not in st.session_state or st.session_state.get("forecast_
                 croston_threshold=croston_threshold,
             )
             results.append(result)
-            log.info(f"Прогноз группы {group_id} | {result.nomenclature[:40]} | продажи={result.sale.method} | ремонт={result.repair.method}")  # ← добавь сюда
+            log.info(f"Прогноз группы {group_id} | {result.nomenclature[:40]} | продажи={result.sale.method} | ремонт={result.repair.method}")
         except Exception as e:
-            log.error(f"Ошибка прогноза группы {group_id}: {e}")  # ← добавь
+            log.error(f"Ошибка прогноза группы {group_id}: {e}")
             st.error(f"Ошибка для группы {group_id}: {e}")
             continue
 
