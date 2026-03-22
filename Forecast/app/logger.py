@@ -11,17 +11,19 @@ def _get_user() -> str:
     Возвращает email пользователя или уникальный ID сессии.
     """
     try:
-        if hasattr(st, "user") and st.user:
-            if st.user.is_logged_in:
-                email = getattr(st.user, "email", None)
-                if email:
-                    return email
+        if hasattr(st, "user") and st.user and st.user.is_logged_in:
+            user_id = (
+                getattr(st.user, "email", None)
+                or getattr(st.user, "id", None)
+                or getattr(st.user, "username", None)
+            )
+            if user_id:
+                return user_id
     except AttributeError:
         pass
     if "session_id" not in st.session_state:
         st.session_state["session_id"] = str(uuid.uuid4())
     return st.session_state["session_id"]
-
 
 @st.cache_resource(ttl=3600)
 def _get_sheet():
