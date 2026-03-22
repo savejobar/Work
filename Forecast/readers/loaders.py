@@ -142,7 +142,12 @@ def preprocess_stock_report(file_path: str) -> pd.DataFrame:
     data = load_dataset(file_path)
     df = data.copy()
     df.columns = df.columns.str.strip()
-
+    
+    df.columns = [
+    col.replace("По месяцам ", "").strip() if "Номенклатура" in col else col
+    for col in df.columns
+    ]
+    
     df["Номенклатура"] = df["Номенклатура"].str.strip()
 
     # Парсинг периодов из заголовочных строк
@@ -153,8 +158,10 @@ def preprocess_stock_report(file_path: str) -> pd.DataFrame:
         na=False,
     )
 
-    df["year"] = df["Номенклатура"].str.extract(r"\b(20[2-9]\d)\b")
-    df["month"] = df["Номенклатура"].str.extract(
+    # Parse period labels only from header rows, not from part numbers in nomenclature.
+    period_labels = df["Номенклатура"].where(period_mask)
+    df["year"] = period_labels.str.extract(r"\b(20[2-9]\d)\b")
+    df["month"] = period_labels.str.extract(
         r"(Январь|Февраль|Март|Апрель|Май|Июнь"
         r"|Июль|Август|Сентябрь|Октябрь|Ноябрь|Декабрь)"
     )

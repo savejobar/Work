@@ -126,7 +126,7 @@ def run_full_pipeline(
         analog_tuple: idx
         for idx, analog_tuple in enumerate(df1["all_analogs"].unique(), start=1)
     }
-    df1["Номер группы"] = df1["all_analogs"].map(group_mapping)
+    df1["Номер группы"] = df1["all_analogs"].apply(group_mapping.get)
     df_quarter = aggregate_repair_groups(df1)
 
     df2 = preprocess_stock_report(stock_path)

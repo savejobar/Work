@@ -21,31 +21,27 @@ def _split_complects(
     если это не так, выбрасывается ValueError.
     """
     matches = get_matches()
-
     mask_plus = (
-        df["Номенклатура"].str.contains(r"\+", na=False)
-        & ~df["Номенклатура"].str.contains(
-            r"^(?:Колесо|РВД|[Оо]богреватель|Контроллер|Deutz"
-            r"|Выключатель|Батарея|Рукав"
-            r"|Распределитель|Насос|Комплект|Кабель|Гидроцилиндр|Датчик|Коллектор"
-            r"|Фильтр топливный PERKINS"
-            r"|Фильтр воздушный \(внешний\+внутренний\) A5541S"
-            r"|Фильтр воздушный к-кт \(внутр\.\+внешн\.\) 1351230502)",
-            na=False,
-        )
+    df["Номенклатура"].str.contains(r"\+", na=False)
+    & ~df["Номенклатура"].str.contains(
+        r"^(?:Колесо|РВД|Обогреватель|Контроллер|Deutz|Набор зарядное|Набор уплотнений|Амортизатор|Клемма|Ryobi|Кнопка|Элемент"
+        r"|Выключатель|Батарея|Рукав|Зажим|Шина|Болт|Кожух|Патрубок|Гидроруль|Крепеж|Тяга|Палец|Кольцо|Фонарь|Подшипник|SATA|Разъ[её]м|Индуктивный|Подстаканник|Секция|Устройство|Предохранитель|Кольца|Вкладыши|Обод|Уплотнение|Ролик|ПВД|Провод|Жгут|Карта|Бесконтактный"
+        r"|Распределитель|Насос|Комплект|Кабель|Гидроцилиндр|Датчик|Коллектор|Микроконтроллер|\*\*\*Шина|Розетка|Лента|Колодка|Адаптер|Накопитель|Коронка|Переходник|Прокладка|Реле|БРС|Ароматизатор|Ремкомплект|Шпилька|Диск|Манжета|Аккумулятор|Поршень|Крепление"
+        r"|Фильтр топливный PERKINS"
+        r"|Фильтр воздушный \(внешний\+внутренний\) A5541S"
+        r"|Фильтр воздушный к-кт \(внутр\.\+внешн\.\) 1351230502"
+        r"|Фильтр воздушный \(к-т внешний\+внутренний\) A5613S"
+        r")",
+        na=False,
     )
-    mask_st_units = df["Номенклатура"].str.contains(
-        r"Фильтр воздушный ST40111/40110", case=False, na=False
-    )
-    mask_brackets = df["Номенклатура"].str.contains(
-        r"(95*165*340/70*90*335,", case=False, na=False, regex=False
-    )
-    mask_hid = df["Номенклатура"].str.contains(
-        r"Фильтр воздушный ST40111ST40110", case=False, na=False
-    )
-    mask_filter = df["Номенклатура"].str.contains(
-        r"Фильтр воздушный 6666375/6666376", case=False, na=False
-    )
+)
+    mask_st_units = df["Номенклатура"].str.contains(r"Фильтр воздушный ST40111/40110", case=False, na=False)
+    mask_brackets = df["Номенклатура"].str.contains(r"(95*165*340/70*90*335,", case=False, na=False, regex=False)
+    mask_hid = df["Номенклатура"].str.contains(r"Фильтр воздушный ST40111ST40110", case=False, na=False)
+    mask_filter = (
+    df["Номенклатура"].str.contains(r"Фильтр воздушный 6666375/6666376", case=False, na=False)
+    | df["Номенклатура"].str.contains(r"Фильтр воздушный комплект DIFA4337DIFA433701", case=False, na=False)
+    ) 
 
     complects = df[mask_plus | mask_st_units | mask_brackets | mask_hid | mask_filter].copy()
     df = df[~df.index.isin(complects.index)]
@@ -62,11 +58,14 @@ def _split_complects(
 
     expected = complects.shape[0] * 2
     actual = df_exploded.shape[0]
+    
     if actual != expected:
+        problem_info = "\n".join(complects["Номенклатура"].unique().tolist())
         raise ValueError(
-            f"Ожидалось {expected} строк после explode комплектов, получено {actual}. "
-            "Проверьте configs/matches.json и маски определения комплектов."
+            f"Ожидалось {expected} строк после explode комплектов, получено {actual}.\n"
+            f"Проблемные номенклатуры:\n{problem_info}"
         )
+
 
     return pd.concat([df, df_exploded], ignore_index=True)
 
