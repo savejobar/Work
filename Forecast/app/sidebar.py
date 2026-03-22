@@ -74,7 +74,7 @@ def _run_pipeline(f1, f2) -> None:
     from app.logger import SessionLogger
 
     log = SessionLogger()
-    log.info(f"Загрузка файлов: {f1.name}, {f2.name}")  # ← сюда, файлы уже известны
+    log.info(f"Загрузка файлов: {f1.name}, {f2.name}")
 
     with st.spinner("Обрабатываем данные..."):
         try:

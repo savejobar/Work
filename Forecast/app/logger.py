@@ -47,7 +47,9 @@ def _get_sheet():
 
 
 def _get_console_logger() -> logging.Logger:
-    """Возвращает логгер для вывода в консоль."""
+    """
+    Возвращает логгер для вывода в консоль.
+    """
     logger = logging.getLogger("forecast_app")
     if not logger.handlers:
         logger.setLevel(logging.INFO)
