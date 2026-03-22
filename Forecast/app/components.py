@@ -33,7 +33,7 @@ def render_search(df: pd.DataFrame) -> list[int] | None:
                 key="article_input",
             )
         with col_btn:
-            st.button("Найти", use_container_width=True)
+            st.button("Найти", width="stretch")
 
         if not article.strip():
             return None
@@ -160,7 +160,7 @@ def render_table(result: GroupForecastResult) -> None:
         df_table.style
         .apply(highlight_total, axis=1)
         .format({col: "{:.1f}" for col in num_cols}),
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -183,14 +183,14 @@ def render_outliers(result: GroupForecastResult) -> None:
         with col_s:
             st.markdown("**Продажи**")
             if sale_out:
-                st.dataframe(pd.DataFrame(sale_out), hide_index=True, use_container_width=True)
+                st.dataframe(pd.DataFrame(sale_out), hide_index=True, width="stretch")
             else:
                 st.caption("Выбросов не обнаружено")
 
         with col_r:
             st.markdown("**Ремонт**")
             if repair_out:
-                st.dataframe(pd.DataFrame(repair_out), hide_index=True, use_container_width=True)
+                st.dataframe(pd.DataFrame(repair_out), hide_index=True, width="stretch")
             else:
                 st.caption("Выбросов не обнаружено")
 
@@ -220,6 +220,6 @@ def render_summary_table(results: list) -> None:
 
     st.dataframe(
         pd.DataFrame(rows),
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )

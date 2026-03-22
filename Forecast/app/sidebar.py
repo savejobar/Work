@@ -31,7 +31,7 @@ def render_sidebar() -> pd.DataFrame | None:
         st.divider()
 
         if f1 and f2:
-            if st.button("Обработать данные", type="primary", use_container_width=True):
+            if st.button("Обработать данные", type="primary", width="stretch"):
                 _run_pipeline(f1, f2)
         else:
             st.info("Загрузите оба файла для начала работы")
@@ -60,7 +60,7 @@ def render_sidebar() -> pd.DataFrame | None:
                 data=st.session_state["processed_excel"],
                 file_name="processed_data.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True,
+                width="stretch",
             )
 
     return st.session_state.get("df_main")

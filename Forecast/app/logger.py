@@ -23,7 +23,7 @@ def _get_user() -> str:
     return st.session_state["session_id"]
 
 
-@st.cache_resource
+@st.cache_resource(ttl=3600)
 def _get_sheet():
     """
     Возвращает первый лист Google таблицы.
