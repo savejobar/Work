@@ -63,6 +63,10 @@ def _get_console_logger() -> logging.Logger:
 
 
 def _write_log(level: str, message: str, user: str) -> None:
+    """
+    Записывает строку лога в Google Sheets.
+    При ошибке пишет в консоль — не прерывает работу приложения.
+    """
     try:
         sheet = _get_sheet()
         sheet.append_row([
