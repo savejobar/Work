@@ -1,6 +1,7 @@
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
+import threading
 
 import streamlit as st
 
@@ -10,19 +11,15 @@ def _get_user() -> str:
     Возвращает email пользователя или уникальный ID сессии.
     """
     try:
-        email = st.context.user.get("email")
-        if email:
-            return email
-    except Exception:
-        pass
-    try:
-        email = st.experimental_user.email
-        if email:
-            return email
-    except Exception:
+        if hasattr(st, "user") and st.user:
+            if st.user.is_logged_in:
+                email = getattr(st.user, "email", None)
+                if email:
+                    return email
+    except AttributeError:
         pass
     if "session_id" not in st.session_state:
-        st.session_state["session_id"] = str(uuid.uuid4())  
+        st.session_state["session_id"] = str(uuid.uuid4())
     return st.session_state["session_id"]
 
 
@@ -53,13 +50,26 @@ def _get_console_logger() -> logging.Logger:
     logger = logging.getLogger("forecast_app")
     if not logger.handlers:
         logger.setLevel(logging.INFO)
+        logger.propagate = False
         handler = logging.StreamHandler()
+
         handler.setFormatter(logging.Formatter(
             "%(asctime)s | %(levelname)s | %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",
         ))
         logger.addHandler(handler)
     return logger
+
+
+def _write_log_async(level: str, message: str, user: str) -> None:
+    """
+    Асинхронная запись лога — не блокирует UI.
+    """
+    threading.Thread(
+        target=_write_log,
+        args=(level, message, user),
+        daemon=True,
+    ).start()
 
 
 def _write_log(level: str, message: str, user: str) -> None:
@@ -69,7 +79,7 @@ def _write_log(level: str, message: str, user: str) -> None:
     try:
         sheet = _get_sheet()
         sheet.append_row([
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
             user,
             level,
             message,
@@ -80,20 +90,20 @@ def _write_log(level: str, message: str, user: str) -> None:
 
 class SessionLogger:
     """
-    Логгер который пишет в Google Sheets и в консоль одновременно.
+    Логгер который пишет в консоль синхронно и в Google Sheets асинхронно.
     """
 
     def info(self, msg: str) -> None:
-        user = _get_user()  # ← один вызов
+        user = _get_user()
         _get_console_logger().info(f"{user} | {msg}")
-        _write_log("INFO", msg, user)
+        _write_log_async("INFO", msg, user)
 
     def warning(self, msg: str) -> None:
         user = _get_user()
         _get_console_logger().warning(f"{user} | {msg}")
-        _write_log("WARNING", msg, user)
+        _write_log_async("WARNING", msg, user)
 
     def error(self, msg: str) -> None:
         user = _get_user()
         _get_console_logger().error(f"{user} | {msg}")
-        _write_log("ERROR", msg, user)
+        _write_log_async("ERROR", msg, user)
