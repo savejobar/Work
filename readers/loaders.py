@@ -44,7 +44,7 @@ def load_config(file_name: str) -> dict:
     return {}
 
 
-_matches_cache: dict | None = None
+_matches_cache: dict[str, str] | None = None
 
 
 def get_matches() -> dict:

@@ -137,6 +137,9 @@ def run_full_pipeline(
 
     article_to_group, article_to_analogs = _build_article_lookup(df1)
 
+    if df2.empty:
+        raise ValueError("Stock report is empty after normalization")
+    
     groups, analogs_list = zip(
         *df2.apply(
             lambda r: _lookup_group(
@@ -146,6 +149,7 @@ def run_full_pipeline(
             axis=1,
         )
     )
+    
     df2["Номер группы"] = groups
     df2["Список аналогов"] = analogs_list
 

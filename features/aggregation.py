@@ -145,33 +145,24 @@ def calculate_external_sales(
 
 
 def fill_missing_months(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Заполняет пропущенные месяцы по группам.
-
-    Правила:
-    - Конечный остаток тянем вперёд как состояние (ffill), но не рисуем искусственный 0 до первого факта.
-    - Продажа и Ремонт заполняются нулём только начиная с первого НЕНУЛЕВОГО значения
-    в соответствующей колонке внутри группы.
-    """
     df = df.copy()
 
     if df.empty:
-        df["is_synthetic"] = pd.Series(dtype="Int8")
-        return df
+        return df.copy()
 
-    df["_original"] = 1
     df["_ym"] = df["Год"] * 100 + df["Месяц"]
 
     all_months = (
-        df[["Год", "Месяц", "_ym"]]
+        df[["Год", "Месяц"]]
         .drop_duplicates()
         .sort_values(["Год", "Месяц"])
         .reset_index(drop=True)
     )
-
+    all_months["_ym"] = all_months["Год"] * 100 + all_months["Месяц"]
 
     start_candidates = []
 
+    # Остаток: старт с первого ИЗВЕСТНОГО значения, не с первого ненулевого
     if "Конечный остаток" in df.columns:
         first_stock = (
             df.loc[df["Конечный остаток"].notna()]
@@ -181,13 +172,15 @@ def fill_missing_months(df: pd.DataFrame) -> pd.DataFrame:
         )
         start_candidates.append(first_stock)
     else:
-        first_stock = pd.Series(dtype="float64")
+        first_stock = pd.Series(dtype="Int64")
 
+    # Продажа/Ремонт: старт с первого НЕНУЛЕВОГО значения независимо по каждой колонке
     first_nonzero_by_col: dict[str, pd.Series] = {}
     for col in ["Продажа", "Ремонт"]:
         if col in df.columns:
+            numeric_col = pd.to_numeric(df[col], errors="coerce").fillna(0)
             first_nonzero = (
-                df.loc[df[col].fillna(0) != 0]
+                df.loc[numeric_col != 0]
                 .groupby("Номер группы")["_ym"]
                 .min()
                 .rename(f"{col}_start")
@@ -195,13 +188,13 @@ def fill_missing_months(df: pd.DataFrame) -> pd.DataFrame:
             first_nonzero_by_col[col] = first_nonzero
             start_candidates.append(first_nonzero)
         else:
-            first_nonzero_by_col[col] = pd.Series(dtype="float64")
+            first_nonzero_by_col[col] = pd.Series(dtype="Int64")
 
     if start_candidates:
         start_df = pd.concat(start_candidates, axis=1)
         group_start = start_df.min(axis=1, skipna=True)
     else:
-        group_start = pd.Series(dtype="float64")
+        group_start = pd.Series(dtype="Int64")
 
     fallback_start = df.groupby("Номер группы")["_ym"].min()
     group_start = group_start.reindex(fallback_start.index).fillna(fallback_start)
@@ -215,16 +208,17 @@ def fill_missing_months(df: pd.DataFrame) -> pd.DataFrame:
         .sort_values(["Номер группы", "Год", "Месяц"], kind="mergesort")
         .reset_index(drop=True)
     )
+
     merged["_ym"] = merged["Год"] * 100 + merged["Месяц"]
 
     meta_cols = ["Номенклатура", "Артикул", "Список аналогов"]
     for col in [c for c in meta_cols if c in merged.columns]:
         merged[col] = merged.groupby("Номер группы")[col].ffill().bfill()
 
+    # Остаток: тянем как состояние
     if "Конечный остаток" in merged.columns:
         merged["Конечный остаток"] = (
-            merged.groupby("Номер группы")["Конечный остаток"]
-            .ffill()
+            merged.groupby("Номер группы")["Конечный остаток"].ffill()
         )
 
         if not first_stock.empty:
@@ -234,19 +228,26 @@ def fill_missing_months(df: pd.DataFrame) -> pd.DataFrame:
                 "Конечный остаток",
             ] = pd.NA
 
+    # Продажа/Ремонт: нули только с первого ненулевого значения КАЖДОЙ колонки
     for col in ["Продажа", "Ремонт"]:
         if col not in merged.columns:
             continue
 
         start_map = merged["Номер группы"].map(first_nonzero_by_col[col])
-        fill_mask = start_map.notna() & (merged["_ym"] >= start_map) & merged[col].isna()
-        merged.loc[fill_mask, col] = 0
 
-    merged["is_synthetic"] = merged["_original"].isna().astype("Int8")
-    merged = merged.drop(columns=[c for c in ["_original", "_ym"] if c in merged.columns])
+        # До старта колонки оставляем NaN
+        merged.loc[
+            start_map.notna() & (merged["_ym"] < start_map),
+            col,
+        ] = pd.NA
 
-    for col in ["Продажа", "Ремонт", "Конечный остаток", "Номер группы"]:
-        if col in merged.columns:
-            merged[col] = merged[col].apply(safe_to_int)
+        # После старта колонки пропуски заполняем нулем
+        merged.loc[
+            start_map.notna() & (merged["_ym"] >= start_map) & merged[col].isna(),
+            col,
+        ] = 0
 
-    return merged.reset_index(drop=True)
+    value_cols = [c for c in ["Конечный остаток", "Продажа", "Ремонт"] if c in merged.columns]
+    merged["is_synthetic"] = merged[value_cols].isna().all(axis=1).astype("Int8")
+
+    return merged.drop(columns="_ym").reset_index(drop=True)

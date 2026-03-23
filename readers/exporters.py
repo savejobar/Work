@@ -21,7 +21,7 @@ def build_batch_excel(results: list, show_clean: bool = True) -> bytes:
     thin = Side(style="thin", color="D0D7DE")
     brd = Border(left=thin, right=thin, top=thin, bottom=thin)
 
-    def w(ws, r, c, v, bold=False, bg=None, align="center", fmt=None, color="000000"):
+    def write_cell(ws, r, c, v, bold=False, bg=None, align="center", fmt=None, color="000000"):
         cell = ws.cell(row=r, column=c, value=v)
         cell.font = Font(name="Calibri", bold=bold, color=color, size=10)
         cell.alignment = Alignment(horizontal=align, vertical="center", wrap_text=True)
@@ -41,32 +41,32 @@ def build_batch_excel(results: list, show_clean: bool = True) -> bytes:
     summary_headers += ["Итого продажи", "Итого ремонт", "Итого спрос", "Нужно заказать"]
 
     for ci, h in enumerate(summary_headers, 1):
-        w(ws_summary, 1, ci, h, bold=True, bg="1A2744", color="FFFFFF")
+        write_cell(ws_summary, 1, ci, h, bold=True, bg="1A2744", color="FFFFFF")
 
     for ri, result in enumerate(results, 2):
         bg = "FFFFFF" if ri % 2 == 0 else "F0F4FA"
-        w(ws_summary, ri, 1, ri - 1, bg=bg)
-        w(ws_summary, ri, 2, result.article, bg=bg)
-        w(ws_summary, ri, 3, result.nomenclature, bg=bg, align="left")
-        w(ws_summary, ri, 4, result.sale.method, bg=bg)
-        w(ws_summary, ri, 5, result.repair.method, bg=bg)
+        write_cell(ws_summary, ri, 1, ri - 1, bg=bg)
+        write_cell(ws_summary, ri, 2, result.article, bg=bg)
+        write_cell(ws_summary, ri, 3, result.nomenclature, bg=bg, align="left")
+        write_cell(ws_summary, ri, 4, result.sale.method, bg=bg)
+        write_cell(ws_summary, ri, 5, result.repair.method, bg=bg)
 
         base = 6
         for i in range(len(fc_months)):
             sv = round(float(result.sale.forecast.iloc[i]), 1)
             rv = round(float(result.repair.forecast.iloc[i]), 1)
-            w(ws_summary, ri, base, sv, bg="FFF3CD", color="B8520A", fmt="#,##0.0")
-            w(ws_summary, ri, base + 1, rv, bg="F4ECF7", color="5B2C6F", fmt="#,##0.0")
+            write_cell(ws_summary, ri, base, sv, bg="FFF3CD", color="B8520A", fmt="#,##0.0")
+            write_cell(ws_summary, ri, base + 1, rv, bg="F4ECF7", color="5B2C6F", fmt="#,##0.0")
             base += 2
 
         sale_total = round(float(result.sale.forecast.sum()), 1)
         repair_total = round(float(result.repair.forecast.sum()), 1)
-        w(ws_summary, ri, base, sale_total, bg="FFF3CD", color="B8520A", bold=True, fmt="#,##0.0")
-        w(ws_summary, ri, base + 1, repair_total, bg="F4ECF7", color="5B2C6F", bold=True, fmt="#,##0.0")
-        w(ws_summary, ri, base + 2, round(sale_total + repair_total, 1), bold=True, fmt="#,##0.0")
+        write_cell(ws_summary, ri, base, sale_total, bg="FFF3CD", color="B8520A", bold=True, fmt="#,##0.0")
+        write_cell(ws_summary, ri, base + 1, repair_total, bg="F4ECF7", color="5B2C6F", bold=True, fmt="#,##0.0")
+        write_cell(ws_summary, ri, base + 2, round(sale_total + repair_total, 1), bold=True, fmt="#,##0.0")
         
         need_to_order = max(0.0, round(sale_total + repair_total - result.ending_stock, 1))
-        w(ws_summary, ri, base + 3, need_to_order, bold=True, fmt="#,##0.0",
+        write_cell(ws_summary, ri, base + 3, need_to_order, bold=True, fmt="#,##0.0",
           bg="DCFCE7", color="166534")
 
     ws_summary.freeze_panes = "F2"
@@ -74,7 +74,7 @@ def build_batch_excel(results: list, show_clean: bool = True) -> bytes:
     # Детали
     detail_headers = ["Артикул", "Номенклатура", "Тип", "Метод", "Нули %"] + month_labels + ["Итого"]
     for ci, h in enumerate(detail_headers, 1):
-        w(ws_detail, 1, ci, h, bold=True, bg="1A2744", color="FFFFFF")
+        write_cell(ws_detail, 1, ci, h, bold=True, bg="1A2744", color="FFFFFF")
 
     current_row = 2
 
@@ -84,18 +84,18 @@ def build_batch_excel(results: list, show_clean: bool = True) -> bytes:
             (result.sale.series_raw == 0).sum() / max(len(result.sale.series_raw), 1) * 100
         )) if result.sale.series_raw is not None else 0
 
-        w(ws_detail, current_row, 1, result.article)
-        w(ws_detail, current_row, 2, result.nomenclature, align="left")
-        w(ws_detail, current_row, 3, "Продажи", bg="FFF3CD", color="B8520A", bold=True)
-        w(ws_detail, current_row, 4, result.sale.method)
-        w(ws_detail, current_row, 5, f"{zero_pct_sale}%")
+        write_cell(ws_detail, current_row, 1, result.article)
+        write_cell(ws_detail, current_row, 2, result.nomenclature, align="left")
+        write_cell(ws_detail, current_row, 3, "Продажи", bg="FFF3CD", color="B8520A", bold=True)
+        write_cell(ws_detail, current_row, 4, result.sale.method)
+        write_cell(ws_detail, current_row, 5, f"{zero_pct_sale}%")
 
         sale_total = 0
         for i in range(len(fc_months)):
             val = round(float(result.sale.forecast.iloc[i]), 1)
             sale_total += val
-            w(ws_detail, current_row, 6 + i, val, bg="FFF3CD", color="B8520A", fmt="#,##0.0")
-        w(ws_detail, current_row, 6 + len(fc_months), round(sale_total, 1), bold=True, fmt="#,##0.0")
+            write_cell(ws_detail, current_row, 6 + i, val, bg="FFF3CD", color="B8520A", fmt="#,##0.0")
+        write_cell(ws_detail, current_row, 6 + len(fc_months), round(sale_total, 1), bold=True, fmt="#,##0.0")
         current_row += 1
 
         # Строка ремонта
@@ -103,18 +103,18 @@ def build_batch_excel(results: list, show_clean: bool = True) -> bytes:
             (result.repair.series_raw == 0).sum() / max(len(result.repair.series_raw), 1) * 100
         )) if result.repair.series_raw is not None else 0
 
-        w(ws_detail, current_row, 1, result.article)
-        w(ws_detail, current_row, 2, result.nomenclature, align="left")
-        w(ws_detail, current_row, 3, "Ремонт", bg="F4ECF7", color="5B2C6F", bold=True)
-        w(ws_detail, current_row, 4, result.repair.method)
-        w(ws_detail, current_row, 5, f"{zero_pct_repair}%")
+        write_cell(ws_detail, current_row, 1, result.article)
+        write_cell(ws_detail, current_row, 2, result.nomenclature, align="left")
+        write_cell(ws_detail, current_row, 3, "Ремонт", bg="F4ECF7", color="5B2C6F", bold=True)
+        write_cell(ws_detail, current_row, 4, result.repair.method)
+        write_cell(ws_detail, current_row, 5, f"{zero_pct_repair}%")
 
         repair_total = 0
         for i in range(len(fc_months)):
             val = round(float(result.repair.forecast.iloc[i]), 1)
             repair_total += val
-            w(ws_detail, current_row, 6 + i, val, bg="F4ECF7", color="5B2C6F", fmt="#,##0.0")
-        w(ws_detail, current_row, 6 + len(fc_months), round(repair_total, 1), bold=True, fmt="#,##0.0")
+            write_cell(ws_detail, current_row, 6 + i, val, bg="F4ECF7", color="5B2C6F", fmt="#,##0.0")
+        write_cell(ws_detail, current_row, 6 + len(fc_months), round(repair_total, 1), bold=True, fmt="#,##0.0")
         current_row += 1
 
         # График

@@ -2,7 +2,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import matplotlib
-import ast
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
@@ -167,6 +166,8 @@ def find_groups_by_article(df: pd.DataFrame, article: str) -> list[dict]:
     """
     Возвращает все группы где артикул содержит введённую строку.
     """
+    import ast
+    
     article_up = article.strip().upper()
 
     mask = (

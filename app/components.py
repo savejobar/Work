@@ -6,6 +6,8 @@ import streamlit as st
 
 from forecasting.runner import GroupForecastResult, forecast_table
 
+NO_OUTLIER_REMOVAL = float('inf')
+
 
 def render_search(df: pd.DataFrame) -> list[int] | None:
     """
@@ -109,7 +111,7 @@ def render_params() -> tuple[int, float, float, bool]:
         )
         no_outliers = st.toggle("Не удалять выбросы", value=True)
         if no_outliers:
-            iqr_factor = float("inf") 
+            iqr_factor = NO_OUTLIER_REMOVAL 
     with col3:
         croston_threshold = st.slider(
             "Порог нулей для TSB", min_value=0.1, max_value=0.8,
@@ -210,8 +212,7 @@ def render_summary_table(results: list) -> None:
             "Метод продаж": result.sale.method,
             "Метод ремонта": result.repair.method,
         }
-        for y, m in fc_months:
-            i = fc_months.index((y, m))
+        for i, (y, m) in enumerate(fc_months):
             lbl = f"{MONTH_RU[m]} {y}"
             row[f"{lbl} Продажи"] = round(float(result.sale.forecast.iloc[i]), 1)
             row[f"{lbl} Ремонт"] = round(float(result.repair.forecast.iloc[i]), 1)

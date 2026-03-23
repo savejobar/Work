@@ -77,8 +77,8 @@ def _tsb_forecast(
 
     best_mse, best_alpha = np.inf, CROSTON_ALPHA
 
-    # Перебор alpha для TSB
     for alpha in np.arange(0.05, 0.55, 0.05):
+
         z = float(nz[0][1])
         p = float(nz[0][0] + 1)
         prev = nz[0][0]
