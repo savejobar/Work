@@ -60,10 +60,12 @@ def _split_complects(
     actual = df_exploded.shape[0]
     
     if actual != expected:
-        problem_info = "\n".join(complects["Номенклатура"].unique().tolist())
         raise ValueError(
-            f"Ожидалось {expected} строк после explode комплектов, получено {actual}.\n"
-            f"Проблемные номенклатуры:\n{problem_info}"
+            "COMPLECT_EXPLODE_MISMATCH: "
+            f"expected={expected}, actual={actual}, "
+            f"source_rows={complects.shape[0]}, "
+            f"unique_nomenclatures={complects['Номенклатура'].nunique()}. "
+            "Проверьте configs/matches.json и правила определения комплектов."
         )
 
 

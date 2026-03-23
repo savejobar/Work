@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import os
 import io
 import tempfile
+import hashlib
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
@@ -81,22 +82,36 @@ def _run_pipeline(f1, f2) -> None:
             b1 = f1.getvalue()
             b2 = f2.getvalue()
 
-            with tempfile.TemporaryDirectory() as tmp:
-                p1 = os.path.join(tmp, f1.name)
-                p2 = os.path.join(tmp, f2.name)
+            dataset_version = hashlib.sha256(b1 + b"||" + b2).hexdigest()
 
-                with open(p1, "wb") as fh:
-                    fh.write(b1)
-                with open(p2, "wb") as fh:
-                    fh.write(b2)
+            with tempfile.TemporaryDirectory() as tmp:
+                suffix1 = Path(f1.name).suffix.lower()
+                suffix2 = Path(f2.name).suffix.lower()
+
+                with tempfile.NamedTemporaryFile(dir=tmp, suffix=suffix1, delete=False) as fh1:
+                    fh1.write(b1)
+                    p1 = fh1.name
+
+                with tempfile.NamedTemporaryFile(dir=tmp, suffix=suffix2, delete=False) as fh2:
+                    fh2.write(b2)
+                    p2 = fh2.name
 
                 df = run_full_pipeline(repair_path=p1, stock_path=p2)
 
             log.info(f"Пайплайн завершён: {len(df)} строк, {df['Номер группы'].nunique()} групп")
             st.session_state["df_main"] = df
+            st.session_state["dataset_version"] = dataset_version
+
             st.session_state.pop("processed_excel", None)
+            st.session_state.pop("forecast_results", None)
+            st.session_state.pop("forecast_key", None)
+            st.session_state.pop("batch_excel", None)
+            st.session_state.pop("batch_key", None)
+
             st.rerun()
 
         except Exception as e:
-            log.error(f"Ошибка пайплайна: {e}")
+            error_code = type(e).__name__
+            log.error(f"PIPELINE_ERROR code={error_code}")
             st.error(f"Ошибка при обработке: {e}")
+

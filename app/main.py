@@ -23,7 +23,16 @@ log = SessionLogger()
 
 @st.fragment
 def download_section(results, show_clean: bool, steps: int, iqr_factor: float, croston_threshold: float):
-    results_key = str([r.group_id for r in results]) + str(show_clean) + str(steps) + str(iqr_factor) + str(croston_threshold)
+    dataset_version = st.session_state.get("dataset_version", "no_dataset")
+    results_key = (
+        str(dataset_version)
+        + str([r.group_id for r in results])
+        + str(show_clean)
+        + str(steps)
+        + str(iqr_factor)
+        + str(croston_threshold)
+    )
+
     if "batch_excel" not in st.session_state or st.session_state.get("batch_key") != results_key:
         st.session_state["batch_excel"] = build_batch_excel(results, show_clean=show_clean)
         st.session_state["batch_key"] = results_key
@@ -104,8 +113,14 @@ if not group_ids:
 
 is_batch = len(group_ids) > 1
 
-# Кэш ключ — все параметры которые влияют на прогноз
-forecast_key = str(group_ids) + str(steps) + str(iqr_factor) + str(croston_threshold)
+dataset_version = st.session_state.get("dataset_version", "no_dataset")
+forecast_key = (
+    str(dataset_version)
+    + str(group_ids)
+    + str(steps)
+    + str(iqr_factor)
+    + str(croston_threshold)
+)
 
 if "forecast_results" not in st.session_state or st.session_state.get("forecast_key") != forecast_key:
     results = []

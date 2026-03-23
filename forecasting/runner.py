@@ -162,13 +162,31 @@ class GroupForecastResult:
     ending_stock: float = 0.0 
 
 
+def build_result_summary(result: GroupForecastResult) -> dict[str, float]:
+    """
+    Возвращает единые итоговые метрики для UI и экспорта.
+    """
+    sale_total = round(float(result.sale.forecast.sum()), 1)
+    repair_total = round(float(result.repair.forecast.sum()), 1)
+    total_demand = round(sale_total + repair_total, 1)
+    need_to_order = max(0.0, round(total_demand - result.ending_stock, 1))
+
+    return {
+        "sale_total": sale_total,
+        "repair_total": repair_total,
+        "total_demand": total_demand,
+        "need_to_order": need_to_order,
+    }
+
+
 def find_groups_by_article(df: pd.DataFrame, article: str) -> list[dict]:
     """
     Возвращает все группы где артикул содержит введённую строку.
     """
-    import ast
     
     article_up = article.strip().upper()
+    if not article_up:
+        return []
 
     mask = (
         df["Артикул"]
@@ -187,13 +205,7 @@ def find_groups_by_article(df: pd.DataFrame, article: str) -> list[dict]:
         for _, row in df.drop_duplicates("Номер группы").iterrows():
             analogs = row["Список аналогов"]
 
-            if isinstance(analogs, str):
-                try:
-                    analogs = ast.literal_eval(analogs)
-                except Exception:
-                    analogs = [analogs]
-
-            if isinstance(analogs, (list, tuple, set)):
+            if isinstance(analogs, tuple):
                 if any(article_up in str(a).strip().upper() for a in analogs):
                     hits.append({
                         "Номер группы": int(row["Номер группы"]),

@@ -4,7 +4,7 @@ import re
 import pandas as pd
 import streamlit as st
 
-from forecasting.runner import GroupForecastResult, forecast_table
+from forecasting.runner import GroupForecastResult, build_result_summary, forecast_table
 
 NO_OUTLIER_REMOVAL = float('inf')
 
@@ -12,7 +12,6 @@ NO_OUTLIER_REMOVAL = float('inf')
 def render_search(df: pd.DataFrame) -> list[int] | None:
     """
     Возвращает список номеров групп или None.
-    Поддерживает одиночный поиск и пакетный режим через Excel.
     """
     from forecasting.runner import find_groups_by_article
 
@@ -23,67 +22,105 @@ def render_search(df: pd.DataFrame) -> list[int] | None:
         ["Одиночный", "Списком"],
         horizontal=True,
         label_visibility="collapsed",
+        key="search_mode",
     )
 
+    if "submitted_articles" not in st.session_state:
+        st.session_state["submitted_articles"] = None
+    if "submitted_mode" not in st.session_state:
+        st.session_state["submitted_mode"] = mode
+
+    if st.session_state["submitted_mode"] != mode:
+        st.session_state["submitted_mode"] = mode
+        st.session_state["submitted_articles"] = None
+
+    uploaded = None
+
     if mode == "Одиночный":
-        col_inp, col_btn = st.columns([3, 1])
-        with col_inp:
-            article = st.text_input(
-                "Артикул",
-                placeholder="Введите артикул или его часть...",
-                label_visibility="collapsed",
-                key="article_input",
-            )
-        with col_btn:
-            st.button("Найти", width="stretch")
+        with st.form("article_search_form", border=False):
+            col_inp, col_btn = st.columns([3, 1], vertical_alignment="bottom")
 
-        if not article.strip():
-            return None
+            with col_inp:
+                st.text_input(
+                    "Артикул",
+                    placeholder="Введите артикул или его часть...",
+                    label_visibility="collapsed",
+                    key="article_input",
+                )
 
-        articles = [a for a in re.split(r"[,\s]+", article.strip()) if a]
+            with col_btn:
+                submitted = st.form_submit_button("Найти", use_container_width=True)
 
     else:
-        uploaded = st.file_uploader(
-            "Загрузите Excel со списком артикулов",
-            type=["xlsx", "xls"],
-            key="articles_file",
-        )
-        if uploaded is None:
-            st.caption("Файл должен содержать колонку 'Артикул'")
-            return None
+        with st.form("article_search_form_file", border=False):
+            uploaded = st.file_uploader(
+                "Загрузите Excel со списком артикулов",
+                type=["xlsx", "xls"],
+                key="articles_file",
+            )
+            submitted = st.form_submit_button("Найти", use_container_width=True)
 
-        try:
-            arts_df = pd.read_excel(uploaded, dtype=str, engine="calamine")
+
+    if submitted:
+        if mode == "Одиночный":
+            raw = st.session_state.get("article_input", "").strip()
+            if not raw:
+                st.session_state["submitted_articles"] = None
+                return None
+
+            st.session_state["submitted_articles"] = [
+                a for a in re.split(r"[,\s]+", raw) if a
+            ]
+
+        else:
+            if uploaded is None:
+                st.session_state["submitted_articles"] = None
+                st.caption("Файл должен содержать колонку 'Артикул'")
+                return None
+
+            try:
+                arts_df = pd.read_excel(uploaded, dtype=str, engine="calamine")
+            except Exception as e:
+                st.session_state["submitted_articles"] = None
+                st.error(f"Ошибка чтения файла: {e}")
+                return None
+
             if "Артикул" not in arts_df.columns:
+                st.session_state["submitted_articles"] = None
                 st.error("В файле нет колонки 'Артикул'")
                 return None
-            articles = arts_df["Артикул"].dropna().str.strip().tolist()
-            st.caption(f"Загружено артикулов: {len(articles)}")
-        except Exception as e:
-            st.error(f"Ошибка чтения файла: {e}")
-            return None
 
-    # Поиск групп
+            st.session_state["submitted_articles"] = [
+                a for a in arts_df["Артикул"].dropna().str.strip().tolist() if a
+            ]
+            st.caption(f"Загружено артикулов: {len(st.session_state['submitted_articles'])}")
+
+    articles = st.session_state.get("submitted_articles")
+    if not articles:
+        return None
+
     group_ids = []
     not_found = []
 
     for i, art in enumerate(articles):
         hits = find_groups_by_article(df, art)
+
         if not hits:
             not_found.append(art)
-        elif len(hits) == 1:
+            continue
+
+        if len(hits) == 1:
             group_ids.append(hits[0]["Номер группы"])
-        else:
-            options = {
-                f"{h['Артикул']} — {str(h['Номенклатура'])[:50]}": h["Номер группы"]
-                for h in hits
-            }
-            selected = st.selectbox(
-                f"Найдено несколько для '{art}':",
-                options=list(options.keys()),
-                key=f"select_{i}_{art}",
-            )
-            group_ids.append(options[selected])
+            continue
+
+        selected = st.selectbox(
+            f"Найдено несколько для '{art}':",
+            options=hits,
+            format_func=lambda h: f"[{h['Номер группы']}] {h['Артикул']} — {str(h['Номенклатура'])[:50]}",
+            key=f"search_select_{i}_{art}",
+        )
+        group_ids.append(selected["Номер группы"])
+
 
     if not_found:
         st.warning(f"Не найдено: {', '.join(not_found)}")
@@ -131,19 +168,16 @@ def render_metrics(result: GroupForecastResult) -> None:
     """
     Карточки с суммарными прогнозными значениями.
     """
-    sale_total = round(float(result.sale.forecast.sum()), 1)
-    repair_total = round(float(result.repair.forecast.sum()), 1)
-    total = round(sale_total + repair_total, 1)
-    need_to_order = max(0.0, round(total - result.ending_stock, 1))
+    summary = build_result_summary(result)
     n_months = len(result.fc_months)
 
     c1, c2, c3, c4, c5, c6 = st.columns(6)
     c1.metric("Номер группы", result.group_id)
     c2.metric("Артикул", result.article[:20])
-    c3.metric(f"Продажи ({n_months} мес.)", f"{sale_total:,.1f}")
-    c4.metric(f"Ремонт ({n_months} мес.)", f"{repair_total:,.1f}")
-    c5.metric("Итого спрос", f"{total:,.1f}")
-    c6.metric("Нужно заказать", f"{need_to_order:,.1f}")
+    c3.metric(f"Продажи ({n_months} мес.)", f"{summary['sale_total']:,.1f}")
+    c4.metric(f"Ремонт ({n_months} мес.)", f"{summary['repair_total']:,.1f}")
+    c5.metric("Итого спрос", f"{summary['total_demand']:,.1f}")
+    c6.metric("Нужно заказать", f"{summary['need_to_order']:,.1f}")
 
 
 def render_table(result: GroupForecastResult) -> None:
@@ -200,12 +234,15 @@ def render_outliers(result: GroupForecastResult) -> None:
 
 
 def render_summary_table(results: list) -> None:
-    """Сводная таблица прогнозов по всем запчастям."""
+    """
+    Сводная таблица прогнозов по всем запчастям.
+    """
     from forecasting.runner import MONTH_RU
 
     fc_months = results[0].fc_months
     rows = []
     for result in results:
+        summary = build_result_summary(result)
         row = {
             "Артикул": result.article,
             "Номенклатура": result.nomenclature[:50],
@@ -216,27 +253,27 @@ def render_summary_table(results: list) -> None:
             lbl = f"{MONTH_RU[m]} {y}"
             row[f"{lbl} Продажи"] = round(float(result.sale.forecast.iloc[i]), 1)
             row[f"{lbl} Ремонт"] = round(float(result.repair.forecast.iloc[i]), 1)
-        row["Итого продажи"] = round(float(result.sale.forecast.sum()), 1)
-        row["Итого ремонт"] = round(float(result.repair.forecast.sum()), 1)
-        row["Итого спрос"] = round(float(result.sale.forecast.sum() + result.repair.forecast.sum()), 1)
-        row["Нужно заказать"] = max(0.0, round(row["Итого спрос"] - result.ending_stock, 1))
+        row["Итого продажи"] = summary["sale_total"]
+        row["Итого ремонт"] = summary["repair_total"]
+        row["Итого спрос"] = summary["total_demand"]
+        row["Нужно заказать"] = summary["need_to_order"]
         rows.append(row)
 
     df_out = pd.DataFrame(rows)
 
     num_cols = [c for c in df_out.columns if df_out[c].dtype in ["float64", "float32"]]
 
-    def highlight_order(s):
-        return [
-            "background-color: #dcfce7; color: #166534; font-weight: bold"
-            if col == "Нужно заказать" else ""
-            for col in df_out.columns
-        ]
-
     st.dataframe(
         df_out.style
-        .apply(highlight_order, axis=1)
-        .format({col: "{:.1f}" for col in num_cols}),  # ← добавить
+        .set_properties(
+            subset=["Нужно заказать"],
+            **{
+                "background-color": "#dcfce7",
+                "color": "#166534",
+                "font-weight": "bold",
+            },
+        )
+        .format({col: "{:.1f}" for col in num_cols}),
         width="stretch",
         hide_index=True,
     )

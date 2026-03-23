@@ -45,19 +45,24 @@ def aggregate_stock_groups(df: pd.DataFrame) -> pd.DataFrame:
 
     df["_part_key"] = df["Артикул"].where(df["Артикул"].notna() & df["Артикул"].ne(""), df["Номенклатура"])
 
-    # Метаданные группы делаем детерминированными, без зависимости от случайного порядка строк.
     meta = (
         df.groupby("Номер группы", as_index=False)
         .agg(
             Номенклатура=("Номенклатура", shortest_value),
             Список_аналогов=(
                 "Список аналогов",
-                lambda x: max(x.dropna().astype(str), key=len, default=None),
+                lambda x: max(
+                    (v for v in x.dropna() if isinstance(v, tuple)),
+                    key=len,
+                    default=None,
+                ),
             ),
             Артикул=("Артикул", shortest_value),
         )
         .rename(columns={"Список_аналогов": "Список аналогов"})
     )
+
+
 
     # 1. Последний остаток по позиции внутри месяца.
     stock_by_part = (

@@ -157,7 +157,6 @@ def preprocess_stock_report(file_path: str) -> pd.DataFrame:
         na=False,
     )
 
-    # Parse period labels only from header rows, not from part numbers in nomenclature.
     period_labels = df["Номенклатура"].where(period_mask)
     df["year"] = period_labels.str.extract(r"\b(20[2-9]\d)\b")
     df["month"] = period_labels.str.extract(
@@ -179,5 +178,6 @@ def preprocess_stock_report(file_path: str) -> pd.DataFrame:
 
     for col in ["Расход", "Приход", "Конечный остаток"]:
         df[col] = df[col].str.replace(",", "", regex=False).astype(float)
+        df.loc[df[col] < 0, col] = 0
 
     return df[STOCK_COLS]

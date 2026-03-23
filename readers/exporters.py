@@ -11,7 +11,7 @@ def build_batch_excel(results: list, show_clean: bool = True) -> bytes:
     """
     Строит Excel с прогнозами для списка запчастей.
     """
-    from forecasting.runner import MONTH_RU, plot_forecast
+    from forecasting.runner import MONTH_RU, build_result_summary, plot_forecast
 
     wb = openpyxl.Workbook()
     ws_summary = wb.active
@@ -58,16 +58,14 @@ def build_batch_excel(results: list, show_clean: bool = True) -> bytes:
             write_cell(ws_summary, ri, base, sv, bg="FFF3CD", color="B8520A", fmt="#,##0.0")
             write_cell(ws_summary, ri, base + 1, rv, bg="F4ECF7", color="5B2C6F", fmt="#,##0.0")
             base += 2
+            
+        summary = build_result_summary(result)
+        write_cell(ws_summary, ri, base, summary["sale_total"], bg="FFF3CD", color="B8520A", bold=True, fmt="#,##0.0")
+        write_cell(ws_summary, ri, base + 1, summary["repair_total"], bg="F4ECF7", color="5B2C6F", bold=True, fmt="#,##0.0")
+        write_cell(ws_summary, ri, base + 2, summary["total_demand"], bold=True, fmt="#,##0.0")
+        write_cell(ws_summary, ri, base + 3, summary["need_to_order"], bold=True, fmt="#,##0.0",
+            bg="DCFCE7", color="166534")
 
-        sale_total = round(float(result.sale.forecast.sum()), 1)
-        repair_total = round(float(result.repair.forecast.sum()), 1)
-        write_cell(ws_summary, ri, base, sale_total, bg="FFF3CD", color="B8520A", bold=True, fmt="#,##0.0")
-        write_cell(ws_summary, ri, base + 1, repair_total, bg="F4ECF7", color="5B2C6F", bold=True, fmt="#,##0.0")
-        write_cell(ws_summary, ri, base + 2, round(sale_total + repair_total, 1), bold=True, fmt="#,##0.0")
-        
-        need_to_order = max(0.0, round(sale_total + repair_total - result.ending_stock, 1))
-        write_cell(ws_summary, ri, base + 3, need_to_order, bold=True, fmt="#,##0.0",
-          bg="DCFCE7", color="166534")
 
     ws_summary.freeze_panes = "F2"
 
