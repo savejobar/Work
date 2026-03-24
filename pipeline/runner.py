@@ -7,7 +7,7 @@ from features.aggregation import (
     aggregate_repair_groups,
     aggregate_stock_groups,
     calculate_external_sales,
-    fill_missing_months,
+    fill_flow_columns,
 )
 from preprocessing.cleaning import (
     normalize_nomenclatures_repair_parts,
