@@ -184,13 +184,15 @@ def render_metrics(result: GroupForecastResult) -> None:
     summary = build_result_summary(result)
     n_months = len(result.fc_months)
 
-    c1, c2, c3, c4, c5, c6 = st.columns(6)
+    c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
     c1.metric("Номер группы", result.group_id)
     c2.metric("Артикул", result.article[:20])
-    c3.metric(f"Продажи ({n_months} мес.)", f"{summary['sale_total']:,.1f}")
-    c4.metric(f"Ремонт ({n_months} мес.)", f"{summary['repair_total']:,.1f}")
-    c5.metric("Итого спрос", f"{summary['total_demand']:,.1f}")
-    c6.metric("Нужно заказать", f"{summary['need_to_order']:,.1f}")
+    c3.metric("Конечный остаток", f"{result.ending_stock:,.1f}")
+    c4.metric(f"Продажи ({n_months} мес.)", f"{summary['sale_total']:,.1f}")
+    c5.metric(f"Ремонт ({n_months} мес.)", f"{summary['repair_total']:,.1f}")
+    c6.metric("Итого спрос", f"{summary['total_demand']:,.1f}")
+    c7.metric("Нужно заказать", f"{summary['need_to_order']:,.1f}")
+
 
 
 def render_table(result: GroupForecastResult) -> None:
@@ -259,6 +261,7 @@ def render_summary_table(results: list) -> None:
         row = {
             "Артикул": result.article,
             "Номенклатура": result.nomenclature[:50],
+            "Конечный остаток": round(float(result.ending_stock), 1),
             "Метод продаж": result.sale.method,
             "Метод ремонта": result.repair.method,
         }

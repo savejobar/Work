@@ -35,7 +35,8 @@ def build_batch_excel(results: list, show_clean: bool = True) -> bytes:
     month_labels = [f"{MONTH_RU[m]} {y}" for y, m in fc_months]
 
     # Сводная таблица
-    summary_headers = ["№", "Артикул", "Номенклатура", "Метод продаж", "Метод ремонта"]
+    summary_headers = ["№", "Артикул", "Номенклатура", "Конечный остаток", "Метод продаж", "Метод ремонта"]
+
     for lbl in month_labels:
         summary_headers += [f"{lbl} Продажи", f"{lbl} Ремонт"]
     summary_headers += ["Итого продажи", "Итого ремонт", "Итого спрос", "Нужно заказать"]
@@ -48,10 +49,12 @@ def build_batch_excel(results: list, show_clean: bool = True) -> bytes:
         write_cell(ws_summary, ri, 1, ri - 1, bg=bg)
         write_cell(ws_summary, ri, 2, result.article, bg=bg)
         write_cell(ws_summary, ri, 3, result.nomenclature, bg=bg, align="left")
-        write_cell(ws_summary, ri, 4, result.sale.method, bg=bg)
-        write_cell(ws_summary, ri, 5, result.repair.method, bg=bg)
+        write_cell(ws_summary, ri, 4, round(float(result.ending_stock), 1), bg=bg, fmt="#,##0.0")
+        write_cell(ws_summary, ri, 5, result.sale.method, bg=bg)
+        write_cell(ws_summary, ri, 6, result.repair.method, bg=bg)
 
-        base = 6
+        base = 7
+
         for i in range(len(fc_months)):
             sv = round(float(result.sale.forecast.iloc[i]), 1)
             rv = round(float(result.repair.forecast.iloc[i]), 1)
@@ -67,7 +70,7 @@ def build_batch_excel(results: list, show_clean: bool = True) -> bytes:
             bg="DCFCE7", color="166534")
 
 
-    ws_summary.freeze_panes = "F2"
+    ws_summary.freeze_panes = "G2"
 
     # Детали
     detail_headers = ["Артикул", "Номенклатура", "Тип", "Метод", "Нули %"] + month_labels + ["Итого"]

@@ -66,7 +66,7 @@ def download_section(
     st.download_button(
         label="Скачать Excel с прогнозами",
         data=st.session_state["batch_excel"],
-        file_name="forecast_batch.xlsx",
+        file_name="forecast.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         type="primary",
     )
@@ -198,16 +198,16 @@ if not results:
     st.stop()
 
 # Вывод результатов
-if is_batch:
-    download_section(
-        results,
-        show_clean=show_clean,
-        steps=steps,
-        iqr_factor=iqr_factor,
-        croston_threshold=croston_threshold,
-        include_last_month=include_last_month,
-    )
+download_section(
+    results,
+    show_clean=show_clean,
+    steps=steps,
+    iqr_factor=iqr_factor,
+    croston_threshold=croston_threshold,
+    include_last_month=include_last_month,
+)
 
+if is_batch:
     st.markdown("### Сводная таблица")
     render_summary_table(results)
 

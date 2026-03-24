@@ -249,7 +249,7 @@ def run_group_forecast(
         grp_stock = grp_stock.sort_values("_ym")
         vals = grp_stock["Конечный остаток"].dropna()
         if not vals.empty:
-            ending_stock = max(0.0, float(vals.iloc[-1]))
+            ending_stock = float(vals.iloc[-1])
 
     return GroupForecastResult(
         group_id=group_id,
