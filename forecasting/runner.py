@@ -235,39 +235,50 @@ def build_result_summary(result: GroupForecastResult) -> dict[str, float]:
 
 
 def find_groups_by_article(df: pd.DataFrame, article: str) -> list[dict]:
-    """
-    Возвращает все группы где артикул содержит введённую строку.
-    """
-    
     article_up = article.strip().upper()
     if not article_up:
         return []
 
-    mask = (
-        df["Артикул"]
-        .astype(str)
-        .str.upper()
-        .str.contains(article_up, na=False, regex=False)
-    )
+    hits = []
 
-    hits = (
-        df[mask]
-        .drop_duplicates("Номер группы")[["Номер группы", "Артикул", "Номенклатура"]]
-        .to_dict("records")
-    )
+    group_rows = df.drop_duplicates("Номер группы")[
+        ["Номер группы", "Артикул", "Номенклатура", "Список аналогов"]
+    ]
 
-    if not hits and "Список аналогов" in df.columns:
-        for _, row in df.drop_duplicates("Номер группы").iterrows():
+    for _, row in group_rows.iterrows():
+        group_id = int(row["Номер группы"])
+        base_article = str(row["Артикул"]).strip()
+        nomenclature = str(row["Номенклатура"])
+
+        matched = None
+
+        if article_up in base_article.upper():
+            matched = base_article
+        else:
             analogs = row["Список аналогов"]
-
             if isinstance(analogs, tuple):
-                if any(article_up in str(a).strip().upper() for a in analogs):
-                    hits.append({
-                        "Номер группы": int(row["Номер группы"]),
-                        "Артикул": str(row["Артикул"]),
-                        "Номенклатура": str(row["Номенклатура"]),
-                    })
+                for analog in analogs:
+                    analog_str = str(analog).strip()
+                    if article_up in analog_str.upper():
+                        matched = analog_str
+                        break
 
+        if matched is not None:
+            hits.append({
+                "Номер группы": group_id,
+                "Артикул": base_article,
+                "Номенклатура": nomenclature,
+                "Совпадение": matched,
+            })
+
+    hits.sort(
+        key=lambda h: (
+            0 if str(h["Совпадение"]).upper() == article_up else 1,
+            0 if str(h["Совпадение"]).upper().startswith(article_up) else 1,
+            str(h["Совпадение"]).upper(),
+            h["Номер группы"],
+        )
+    )
     return hits
 
 

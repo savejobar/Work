@@ -10,7 +10,7 @@ import pandas as pd
 import streamlit as st
 
 from forecasting.runner import MONTH_RU
-from readers.excel_safety import sanitize_excel_dataframe
+from readers.loaders import sanitize_excel_dataframe
 
 
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024 

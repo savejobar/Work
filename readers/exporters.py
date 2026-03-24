@@ -6,7 +6,7 @@ import openpyxl
 from openpyxl.drawing.image import Image as XLImage
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
-from readers.excel_safety import sanitize_excel_value
+from readers.loaders import sanitize_excel_value
 
 def build_batch_excel(results: list, show_clean: bool = True) -> bytes:
     """

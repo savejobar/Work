@@ -120,14 +120,23 @@ def render_search(df: pd.DataFrame) -> list[int] | None:
             group_ids.append(hits[0]["Номер группы"])
             continue
 
-        selected = st.selectbox(
+        option_map = {
+            str(h["Номер группы"]): h
+            for h in hits
+        }
+
+        selected_key = st.selectbox(
             f"Найдено несколько для '{art}':",
-            options=hits,
-            format_func=lambda h: f"[{h['Номер группы']}] {h['Артикул']} — {str(h['Номенклатура'])[:50]}",
+            options=list(option_map.keys()),
+            format_func=lambda key: (
+                f"[{option_map[key]['Номер группы']}] "
+                f"{option_map[key]['Совпадение']} — "
+                f"{str(option_map[key]['Номенклатура'])[:50]}"
+            ),
             key=f"search_select_{i}_{art}",
         )
-        group_ids.append(selected["Номер группы"])
 
+        group_ids.append(option_map[selected_key]["Номер группы"])
 
     if not_found:
         st.warning(f"Не найдено: {', '.join(not_found)}")
@@ -178,7 +187,7 @@ def render_params() -> tuple[int, float, float, bool, bool]:
         include_last_month = st.toggle(
             "Учитывать последний месяц",
             value=True,
-            help="Если выключено, текущий календарный месяц полностью исключается из обучения. Тогда прогноз начинается с текущего месяца.",
+            help="Если выключено, текущий календарный месяц полностью исключается из рассмотрения. Тогда прогноз начинается с текущего месяца.",
         )
 
 
