@@ -90,6 +90,54 @@ def _enrich_analogs(
     return analogs
 
 
+def _sync_group_membership(
+    df1: pd.DataFrame,
+    df2: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Синхронизирует состав аналогов между repair- и stock-данными
+    для уже найденных групп.
+    """
+    art_by_group = (
+        df2[df2["Номер группы"].notna()]
+        .assign(Артикул_norm=lambda d: d["Артикул"].apply(normalize))
+        .dropna(subset=["Артикул_norm"])
+        .groupby("Номер группы")["Артикул_norm"]
+        .apply(set)
+        .to_dict()
+    )
+
+    df1_group_idx: defaultdict[int, list[int]] = defaultdict(list)
+    for i, g in df1["Номер группы"].dropna().items():
+        df1_group_idx[int(g)].append(i)
+
+    df2_group_idx: defaultdict[int, list[int]] = defaultdict(list)
+    for i, g in df2["Номер группы"].dropna().items():
+        df2_group_idx[int(g)].append(i)
+
+    for grp, arts in art_by_group.items():
+        grp = int(grp)
+        idxs_df1 = df1_group_idx.get(grp, [])
+        if not idxs_df1:
+            continue
+
+        existing = df1.at[idxs_df1[0], "all_analogs"]
+        if not isinstance(existing, tuple):
+            continue
+
+        new_arts = arts - set(existing)
+        if not new_arts:
+            continue
+
+        new_analogs = tuple(sorted(set(existing) | new_arts))
+        for i in idxs_df1:
+            df1.at[i, "all_analogs"] = new_analogs
+        for i in df2_group_idx.get(grp, []):
+            df2.at[i, "Список аналогов"] = new_analogs
+
+    return df1, df2
+
+
 def run_full_pipeline(
     repair_path: str,
     stock_path: str,
@@ -137,7 +185,7 @@ def run_full_pipeline(
         analog_tuple: idx
         for idx, analog_tuple in enumerate(df1["all_analogs"].unique(), start=1)
     }
-    df1["Номер группы"] = df1["all_analogs"].apply(group_mapping.get)
+    df1["Номер группы"] = df1["all_analogs"].apply(group_mapping.get).astype("Int64")
     df_quarter = aggregate_repair_groups(df1)
 
     df2 = preprocess_stock_report(stock_path)
@@ -166,7 +214,7 @@ def run_full_pipeline(
         )
     )
     
-    df2["Номер группы"] = groups
+    df2["Номер группы"] = pd.Series(groups, index=df2.index, dtype="Int64")
     df2["Список аналогов"] = analogs_list
 
     df2["Список аналогов"] = df2.apply(
@@ -174,8 +222,36 @@ def run_full_pipeline(
     )
     df2 = normalize_analog_lists(df2)
 
-    graph_new = defaultdict(set)
+    df1, df2 = _sync_group_membership(df1, df2)
+    article_to_group, article_to_analogs = _build_article_lookup(df1)
 
+    unmatched_idx = df2[df2["Номер группы"].isna()].index
+    relinked_idx: list[int] = []
+
+    for idx in unmatched_idx:
+        grp, analogs = _lookup_group(
+            normalize(df2.at[idx, "Артикул"]),
+            normalize(df2.at[idx, "Оригинальный номер"]),
+            article_to_group,
+            article_to_analogs,
+        )
+        if grp is None:
+            continue
+
+        df2.at[idx, "Номер группы"] = grp
+        df2.at[idx, "Список аналогов"] = analogs
+        relinked_idx.append(idx)
+
+    if relinked_idx:
+        df2.loc[relinked_idx, "Список аналогов"] = (
+            df2.loc[relinked_idx]
+            .apply(lambda r: _enrich_analogs(r, article_to_group), axis=1)
+        )
+        df2 = normalize_analog_lists(df2)
+        df1, df2 = _sync_group_membership(df1, df2)
+        article_to_group, article_to_analogs = _build_article_lookup(df1)
+
+    graph_new = defaultdict(set)
     unmatched_idx = df2[df2["Номер группы"].isna()].index
 
     for idx in unmatched_idx:
@@ -205,39 +281,6 @@ def run_full_pipeline(
                         graph_new[af].add(bf)
                         graph_new[bf].add(af)
 
-    art_by_group = (
-        df2[df2["Номер группы"].notna()]
-        .assign(Артикул_norm=lambda d: d["Артикул"].apply(normalize))
-        .dropna(subset=["Артикул_norm"])
-        .groupby(df2["Номер группы"].dropna().astype(str))["Артикул_norm"]
-        .apply(set)
-        .to_dict()
-    )
-
-    df1_group_idx: defaultdict[str, list] = defaultdict(list)
-    for i, g in df1["Номер группы"].astype(str).items():
-        df1_group_idx[g].append(i)
-
-    df2_group_idx: defaultdict[str, list] = defaultdict(list)
-    for i, g in df2["Номер группы"].dropna().astype(str).items():
-        df2_group_idx[g].append(i)
-
-    for grp, arts in art_by_group.items():
-        idxs_df1 = df1_group_idx.get(grp, [])
-        if not idxs_df1:
-            continue
-        existing = df1.at[idxs_df1[0], "all_analogs"]
-        if not isinstance(existing, tuple):
-            continue
-        new_arts = arts - set(existing)
-        if not new_arts:
-            continue
-        new_analogs = tuple(sorted(existing + tuple(new_arts)))
-        for i in idxs_df1:
-            df1.at[i, "all_analogs"] = new_analogs
-        for i in df2_group_idx.get(grp, []):
-            df2.at[i, "Список аналогов"] = new_analogs
-
     for idx in unmatched_idx:
         art = normalize(df2.at[idx, "Артикул"])
         orig = normalize(df2.at[idx, "Оригинальный номер"])
@@ -262,7 +305,7 @@ def run_full_pipeline(
     df2.loc[mask_new, "Номер группы"] = df2.loc[mask_new, "Список аналогов"].apply(
         lambda x: new_group_map.get(x)
     )
-
+    df2["Номер группы"] = df2["Номер группы"].astype("Int64")
     agg = aggregate_stock_groups(df2)
     agg = calculate_external_sales(agg, df_quarter)
 

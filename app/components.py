@@ -84,13 +84,21 @@ def render_search(df: pd.DataFrame) -> list[int] | None:
                 st.error(f"Ошибка чтения файла: {e}")
                 return None
 
-            if "Артикул" not in arts_df.columns:
+            normalized_cols = {
+                str(col).strip().casefold(): col
+                for col in arts_df.columns
+            }
+
+            article_col = normalized_cols.get("артикул")
+            if article_col is None:
                 st.session_state["submitted_articles"] = None
                 st.error("В файле нет колонки 'Артикул'")
                 return None
 
             st.session_state["submitted_articles"] = [
-                a for a in arts_df["Артикул"].dropna().str.strip().tolist() if a
+                a
+                for a in arts_df[article_col].dropna().str.strip().tolist()
+                if a
             ]
             st.caption(f"Загружено артикулов: {len(st.session_state['submitted_articles'])}")
 
@@ -156,7 +164,7 @@ def render_params() -> tuple[int, float, float, bool, bool]:
         croston_threshold = st.slider(
             "Порог нулей для TSB", min_value=0.1, max_value=0.8,
             value=0.40, step=0.05,
-            help="Если доля нулей в серии выше порога — применяется TSB/Croston",
+            help="Если доля нулей в серии выше порога — применяется TSB",
         )
 
     with col4:

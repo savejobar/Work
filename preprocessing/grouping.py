@@ -56,6 +56,17 @@ def build_analog_graph(df: pd.DataFrame) -> defaultdict[str, set[str]]:
     return graph
 
 
+def _merge_analog_tuples(series: pd.Series) -> tuple | None:
+    """
+    Объединяет все tuple-значения из серии в один отсортированный tuple.
+    """
+    tuples = [v for v in series if isinstance(v, tuple)]
+    if not tuples:
+        return None
+    merged = sorted({item for tpl in tuples for item in tpl})
+    return tuple(merged)
+
+
 def normalize_analog_lists(
     df: pd.DataFrame,
     col_group: str = "Номер группы",
@@ -67,13 +78,9 @@ def normalize_analog_lists(
     """
     df = df.copy()
 
-    group_max: dict = (
+    group_max = (
         df.groupby(col_group)[col_analogs]
-        .apply(lambda s: max(
-            (v for v in s if isinstance(v, tuple)),
-            key=len,
-            default=None,
-        ))
+        .apply(_merge_analog_tuples)
         .to_dict()
     )
 

@@ -4,12 +4,60 @@ import io
 import tempfile
 import hashlib
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import streamlit as st
 
 from forecasting.runner import MONTH_RU
 from readers.excel_safety import sanitize_excel_dataframe
+
+
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024 
+
+
+def _uploaded_size(uploaded_file: Any) -> int:
+    """
+    Возвращает размер загруженного файла в байтах.
+    """
+    size = getattr(uploaded_file, "size", None)
+    if size is not None:
+        return int(size)
+    return len(uploaded_file.getbuffer())
+
+
+def _validate_upload_size(uploaded_file: Any, label: str) -> None:
+    """
+    Проверяет, что размер загруженного файла не превышает допустимый лимит.
+    """
+    size = _uploaded_size(uploaded_file)
+    if size > MAX_UPLOAD_BYTES:
+        raise ValueError(
+            f"{label}: файл слишком большой ({size / 1024 / 1024:.1f} MB). "
+            f"Лимит: {MAX_UPLOAD_BYTES / 1024 / 1024:.0f} MB."
+        )
+    
+
+def _clear_search_state() -> None:
+    """
+    Сбрасывает состояние поиска при загрузке нового датасета.
+    """
+    keys_to_drop = [
+        "search_mode",
+        "submitted_mode",
+        "submitted_articles",
+        "article_input",
+        "articles_file",
+    ]
+    for key in keys_to_drop:
+        st.session_state.pop(key, None)
+
+    search_select_keys = [
+        key for key in list(st.session_state.keys())
+        if key.startswith("search_select_")
+    ]
+    for key in search_select_keys:
+        st.session_state.pop(key, None)
 
 
 def render_sidebar() -> pd.DataFrame | None:
@@ -37,6 +85,10 @@ def render_sidebar() -> pd.DataFrame | None:
                 _run_pipeline(f1, f2)
         else:
             st.info("Загрузите оба файла для начала работы")
+
+        pipeline_notice = st.session_state.get("pipeline_notice")
+        if pipeline_notice:
+            st.warning(pipeline_notice)
 
         if "df_main" in st.session_state:
             df = st.session_state["df_main"]
@@ -70,13 +122,18 @@ def render_sidebar() -> pd.DataFrame | None:
 
 
 def _run_pipeline(f1, f2) -> None:
-    """
-    Запускает полный ETL-пайплайн из загруженных файлов.
-    """
     from pipeline.runner import run_full_pipeline
     from app.logger import SessionLogger
 
     log = SessionLogger()
+
+    try:
+        _validate_upload_size(f1, "Запчасти списанные в ремонт")
+        _validate_upload_size(f2, "Остатки и обороты")
+    except ValueError as e:
+        st.error(str(e))
+        return
+
     log.info(f"Загрузка файлов: {f1.name}, {f2.name}")
 
     with st.spinner("Обрабатываем данные..."):
@@ -109,11 +166,19 @@ def _run_pipeline(f1, f2) -> None:
             st.session_state.pop("forecast_key", None)
             st.session_state.pop("batch_excel", None)
             st.session_state.pop("batch_key", None)
+            st.session_state.pop("pipeline_notice", None)
+            _clear_search_state()
 
             st.rerun()
 
         except Exception as e:
             error_code = type(e).__name__
+            if "df_main" in st.session_state:
+                st.session_state["pipeline_notice"] = (
+                    "Новая загрузка не удалась, показан предыдущий набор данных."
+                )
+            else:
+                st.session_state.pop("pipeline_notice", None)
             log.error(f"PIPELINE_ERROR code={error_code}")
             st.error(f"Ошибка при обработке: {e}")
 

@@ -106,8 +106,6 @@ def normalize_nomenclatures_repair_parts(df: pd.DataFrame) -> pd.DataFrame:
         .apply(lambda x: x.str.strip())
     )
 
-    df
-
     df = _split_complects(
         df,
         art_col="Номенклатура.Артикул",
@@ -116,7 +114,6 @@ def normalize_nomenclatures_repair_parts(df: pd.DataFrame) -> pd.DataFrame:
     )
 
     return df
-
 
 
 def normalize_nomenclatures_stock_report(df: pd.DataFrame) -> pd.DataFrame:

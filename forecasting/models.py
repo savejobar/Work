@@ -7,7 +7,8 @@ import pandas as pd
 
 
 CROSTON_THRESHOLD = 0.40
-CROSTON_ALPHA = 0.1
+TSB_DEFAULT_ALPHA = 0.1
+TSB_DEFAULT_BETA = 0.1
 MIN_SEASONAL_OBS = 24
 MIN_HOLT_OBS = 4
 
@@ -65,50 +66,72 @@ def _tsb_forecast(
     fc_index: pd.DatetimeIndex,
 ) -> tuple[pd.Series, str]:
     """
-    TSB (Teunter-Syntetos-Babai) — модификация Кростона с оптимизацией alpha.
-    Минимизирует MSE по сетке alpha ∈ [0.05, 0.50].
-    Возвращает лучший прогноз и название метода.
+    TSB (Teunter-Syntetos-Babai) для прерывистого спроса.
+
+    В отличие от Croston, TSB обновляет вероятность спроса на каждом периоде,
+    включая нулевые месяцы. Это позволяет прогнозу снижаться для "затухающих"
+    позиций с длинным хвостом нулей.
+
+    Параметры alpha и beta подбираются по сетке, минимизируя in-sample MSE
+    одношаговых прогнозов.
     """
-    vals = series.values
-    nz = [(i, v) for i, v in enumerate(vals) if v > 0]
+    vals = np.asarray(series, dtype=float)
+    nz = np.flatnonzero(vals > 0)
 
-    if not nz:
-        return pd.Series([0.0] * steps, index=fc_index), "Croston"
+    if len(nz) == 0:
+        return pd.Series([0.0] * steps, index=fc_index), "TSB"
 
-    best_mse, best_alpha = np.inf, CROSTON_ALPHA
+    start = int(nz[0])
 
-    for alpha in np.arange(0.05, 0.55, 0.05):
+    # После первого ненулевого значения _get_series обычно уже обрезает ряд,
+    # но здесь дополнительно защищаемся от внешних вызовов с ведущими нулями.
+    vals = vals[start:]
 
-        z = float(nz[0][1])
-        p = float(nz[0][0] + 1)
-        prev = nz[0][0]
+    if len(vals) == 1:
+        fc_val = max(0.0, round(float(vals[0]), 2))
+        return (
+            pd.Series([fc_val] * steps, index=fc_index),
+            f"TSB(α={TSB_DEFAULT_ALPHA:.2f}, β={TSB_DEFAULT_BETA:.2f})",
+        )
+
+    def fit_tsb(alpha: float, beta: float) -> tuple[float, float, float]:
+        """
+        Возвращает сглаженный размер спроса z, вероятность спроса p и MSE.
+        """
+        z = float(vals[0])
+        p = 1.0
         errors: list[float] = []
 
-        for i2, v2 in nz[1:]:
-            pred = z / p if p > 0 else 0.0
-            errors.append((v2 - pred) ** 2)
-            z = alpha * v2 + (1 - alpha) * z
-            p = alpha * (i2 - prev) + (1 - alpha) * p
-            prev = i2
+        for y in vals[1:]:
+            forecast = p * z
+            errors.append((float(y) - forecast) ** 2)
 
-        mse = float(np.mean(errors)) if errors else np.inf
-        if mse < best_mse:
-            best_mse = mse
-            best_alpha = alpha
+            has_demand = 1.0 if y > 0 else 0.0
+            if has_demand:
+                z = alpha * float(y) + (1 - alpha) * z
+            p = beta * has_demand + (1 - beta) * p
 
-    # Финальный расчёт с лучшим alpha
-    alpha = best_alpha
-    z = float(nz[0][1])
-    p = float(nz[0][0] + 1)
-    prev = nz[0][0]
+        mse = float(np.mean(errors)) if errors else 0.0
+        return z, p, mse
 
-    for i2, v2 in nz[1:]:
-        z = alpha * v2 + (1 - alpha) * z
-        p = alpha * (i2 - prev) + (1 - alpha) * p
-        prev = i2
+    best_mse = np.inf
+    best_alpha = TSB_DEFAULT_ALPHA
+    best_beta = TSB_DEFAULT_BETA
+    best_z = float(vals[0])
+    best_p = 1.0
 
-    fc_val = max(0.0, round(z / p, 2)) if p > 0 else 0.0
-    method = f"TSB(α={best_alpha:.2f})"
+    for alpha in np.arange(0.05, 0.55, 0.05):
+        for beta in np.arange(0.05, 0.55, 0.05):
+            z, p, mse = fit_tsb(float(alpha), float(beta))
+            if mse < best_mse:
+                best_mse = mse
+                best_alpha = float(alpha)
+                best_beta = float(beta)
+                best_z = z
+                best_p = p
+
+    fc_val = max(0.0, round(best_p * best_z, 2))
+    method = f"TSB(α={best_alpha:.2f}, β={best_beta:.2f})"
     return pd.Series([fc_val] * steps, index=fc_index), method
 
 
@@ -179,7 +202,7 @@ def forecast_series(
     series: pd.Series,
     steps: int,
     fc_start_date: pd.Timestamp,
-    iqr_factor: float = 1.5,
+    iqr_factor: float | None = 1.5,
     croston_threshold: float = CROSTON_THRESHOLD,
 ) -> ForecastResult:
     """
@@ -187,14 +210,19 @@ def forecast_series(
 
     Алгоритм выбора:
         1. Очищает выбросы через IQR (iqr_factor регулирует чувствительность).
-        2. Если доля нулей > croston_threshold → TSB (модификация Кростона).
+           Если iqr_factor=None, очистка выбросов отключается.
+        2. Если доля нулей > croston_threshold → TSB для прерывистого спроса.
         3. Иначе → лучшая ETS/Holt-Winters по AIC.
     """
     s_raw = series.clip(lower=0)
     n_obs = len(s_raw)
 
     # Очистка выбросов
-    s_clean, outliers = remove_outliers_local(s_raw, iqr_factor)
+    if iqr_factor is None:
+        s_clean = s_raw.copy()
+        outliers = []
+    else:
+        s_clean, outliers = remove_outliers_local(s_raw, iqr_factor)
 
     fc_index = pd.date_range(fc_start_date, periods=steps, freq="MS")
     zero_ratio = (s_clean == 0).sum() / max(n_obs, 1)

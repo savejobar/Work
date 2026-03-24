@@ -123,6 +123,11 @@ def preprocess_repair_parts(file_path: str) -> pd.DataFrame:
         r"подъ[её]мник", case=False, na=False, regex=True
     )]
 
+    if df.empty:
+        raise ValueError(
+            "В отчете 'Запчасти списанные в ремонт' не найдено строк по подъёмной технике."
+        )
+
     df["Номенклатура"] = df["Номенклатура"].str.strip()
 
     # Временные поля
