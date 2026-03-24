@@ -36,50 +36,105 @@ def _next_months(year: int, month: int, n: int) -> list[tuple[int, int]]:
     return result
 
 
+def _month_start(year: int, month: int) -> pd.Timestamp:
+    """
+    Возвращает первый день месяца.
+    """
+    return pd.Timestamp(year=year, month=month, day=1)
+
+
+def _months_between(start: pd.Timestamp, end: pd.Timestamp) -> int:
+    """
+    Возвращает число полных календарных месяцев между началом месяцев.
+    """
+    return (end.year - start.year) * 12 + (end.month - start.month)
+
+
 def _get_train_end(df: pd.DataFrame) -> tuple[int, int]:
     """
     Возвращает год и месяц последней строки датафрейма.
-    Используется как граница обучающей выборки для модели прогноза.
+
+    Граница обучения определяется уже подготовленным df_work:
+    если тумблер исключения последнего месяца выключен, текущий месяц
+    отфильтрован заранее, и прогноз начнётся с него; если тумблер включён,
+    последняя строка участвует в обучении.
     """
     last = df.sort_values(["Год", "Месяц"]).iloc[-1]
     return int(last["Год"]), int(last["Месяц"])
 
 
-def _get_series(
-    df: pd.DataFrame,
+def _build_monthly_group_frame(
+    grp: pd.DataFrame,
     group_id: int,
-    col: str,
     train_end_year: int,
     train_end_month: int,
+) -> pd.DataFrame:
+    """
+    Достраивает для группы непрерывную месячную сетку до train_end.
+
+    Потоковые колонки остаются пустыми в отсутствующих месяцах и
+    интерпретируются позже в _get_series(). Конечный остаток протягивается
+    вперёд, чтобы расчёт need_to_order брал последний известный остаток на
+    общей календарной оси.
+    """
+    if grp.empty:
+        return grp.copy()
+
+    train_end = pd.Timestamp(year=train_end_year, month=train_end_month, day=1)
+
+    monthly = grp.copy()
+    monthly["_date"] = pd.to_datetime(
+        monthly["Год"].astype(str)
+        + "-"
+        + monthly["Месяц"].astype(str).str.zfill(2)
+        + "-01"
+    )
+    monthly = monthly[monthly["_date"] <= train_end].sort_values("_date")
+
+    if monthly.empty:
+        return monthly
+
+    full_index = pd.date_range(start=monthly["_date"].min(), end=train_end, freq="MS")
+    monthly = monthly.set_index("_date").reindex(full_index)
+
+    monthly["Год"] = monthly.index.year
+    monthly["Месяц"] = monthly.index.month
+    monthly["Номер группы"] = group_id
+
+    if "Конечный остаток" in monthly.columns:
+        monthly["Конечный остаток"] = (
+            pd.to_numeric(monthly["Конечный остаток"], errors="coerce").ffill()
+        )
+
+    for col in ["Артикул", "Номенклатура"]:
+        if col in monthly.columns:
+            monthly[col] = monthly[col].ffill().bfill()
+
+    return monthly
+
+
+def _get_series(
+    grp: pd.DataFrame,
+    col: str,
 ) -> pd.Series:
     """
-    Извлекает временной ряд для группы и колонки.
-    Начало ряда — первый месяц с col > 0 для данной группы.
+    Извлекает непрерывный месячный ряд для одной колонки группы.
+
+    После первого ненулевого значения пропущенные месяцы трактуются как нули.
     """
-    train_end_ym = train_end_year * 100 + train_end_month
-
-    grp = df[df["Номер группы"] == group_id].copy()
-    grp["_ym"] = grp["Год"] * 100 + grp["Месяц"]
-    grp = grp[grp["_ym"] <= train_end_ym].sort_values("_ym")
-
-    if grp.empty:
+    if grp.empty or col not in grp.columns:
         return pd.Series(dtype=float)
 
-    values = grp[col].fillna(0).astype(float)
+    values = pd.to_numeric(grp[col], errors="coerce")
 
-    # Обрезаем до первого ненулевого значения этой конкретной колонки
-    first_nonzero = (values > 0).idxmax()
-    if values[first_nonzero] == 0:
-        # Колонка полностью нулевая — возвращаем пустую серию
+    nonzero = values[values.fillna(0) > 0]
+    if nonzero.empty:
         return pd.Series(dtype=float)
 
-    grp = grp.loc[first_nonzero:]
-    values = values.loc[first_nonzero:]
-
-    dates = pd.to_datetime(
-        grp["Год"].astype(str) + "-" + grp["Месяц"].astype(str).str.zfill(2) + "-01"
-    )
-    return pd.Series(values.values, index=pd.DatetimeIndex(dates, freq="MS"))
+    start = nonzero.index[0]
+    values = values.loc[start:].fillna(0).astype(float)
+    values.index = pd.DatetimeIndex(values.index, freq="MS")
+    return values
 
 
 def _draw_panel(
@@ -217,8 +272,11 @@ def find_groups_by_article(df: pd.DataFrame, article: str) -> list[dict]:
 
 
 def run_group_forecast(
-    df: pd.DataFrame,
+    grp: pd.DataFrame,
     group_id: int,
+    train_end_year: int,
+    train_end_month: int,
+    forecast_start: pd.Timestamp,
     steps: int = 3,
     iqr_factor: float = 1.5,
     croston_threshold: float = 0.40,
@@ -228,26 +286,47 @@ def run_group_forecast(
     """
     steps = max(1, min(12, steps))
 
-    meta_row = df[df["Номер группы"] == group_id].iloc[0]
+    if grp.empty:
+        raise ValueError(f"Группа {group_id} не найдена")
+
+    meta_row = grp.iloc[0]
     nomenclature = str(meta_row["Номенклатура"])[:80]
     article_out = str(meta_row["Артикул"])
+    grp_monthly = _build_monthly_group_frame(grp, group_id, train_end_year, train_end_month)
 
-    train_end_year, train_end_month = _get_train_end(df)
-    fc_months = _next_months(train_end_year, train_end_month, steps)
-    fc_start = pd.Timestamp(year=fc_months[0][0], month=fc_months[0][1], day=1)
+    natural_start = _month_start(*_next_months(train_end_year, train_end_month, 1)[0])
+    forecast_start = max(forecast_start.normalize(), natural_start)
+    lead_months = _months_between(natural_start, forecast_start)
+    total_steps = steps + lead_months
 
-    sale_series = _get_series(df, group_id, "Продажа", train_end_year, train_end_month)
-    repair_series = _get_series(df, group_id, "Ремонт", train_end_year, train_end_month)
+    fc_months_full = _next_months(train_end_year, train_end_month, total_steps)
+    fc_start_full = _month_start(*fc_months_full[0])
 
-    sale_result = forecast_series(sale_series, steps, fc_start, iqr_factor, croston_threshold)
-    repair_result = forecast_series(repair_series, steps, fc_start, iqr_factor, croston_threshold)
+    sale_series = _get_series(grp_monthly, "Продажа")
+    repair_series = _get_series(grp_monthly, "Ремонт")
+
+    sale_result = forecast_series(
+        sale_series,
+        total_steps,
+        fc_start_full,
+        iqr_factor,
+        croston_threshold,
+    )
+    repair_result = forecast_series(
+        repair_series,
+        total_steps,
+        fc_start_full,
+        iqr_factor,
+        croston_threshold,
+    )
+
+    sale_result.forecast = sale_result.forecast.iloc[lead_months:lead_months + steps]
+    repair_result.forecast = repair_result.forecast.iloc[lead_months:lead_months + steps]
+    fc_months = fc_months_full[lead_months:lead_months + steps]
 
     ending_stock = 0.0
-    if "Конечный остаток" in df.columns:
-        grp_stock = df[df["Номер группы"] == group_id].copy()
-        grp_stock["_ym"] = grp_stock["Год"] * 100 + grp_stock["Месяц"]
-        grp_stock = grp_stock.sort_values("_ym")
-        vals = grp_stock["Конечный остаток"].dropna()
+    if "Конечный остаток" in grp_monthly.columns:
+        vals = grp_monthly["Конечный остаток"].dropna()
         if not vals.empty:
             ending_stock = float(vals.iloc[-1])
 
@@ -258,7 +337,7 @@ def run_group_forecast(
         sale=sale_result,
         repair=repair_result,
         fc_months=fc_months,
-        ending_stock=ending_stock, 
+        ending_stock=ending_stock,
     )
 
 

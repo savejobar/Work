@@ -60,7 +60,6 @@ def render_search(df: pd.DataFrame) -> list[int] | None:
             )
             submitted = st.form_submit_button("Найти", use_container_width=True)
 
-
     if submitted:
         if mode == "Одиночный":
             raw = st.session_state.get("article_input", "").strip()
@@ -125,6 +124,8 @@ def render_search(df: pd.DataFrame) -> list[int] | None:
     if not_found:
         st.warning(f"Не найдено: {', '.join(not_found)}")
 
+    group_ids = list(dict.fromkeys(group_ids))
+
     return group_ids if group_ids else None
 
 
@@ -169,12 +170,11 @@ def render_params() -> tuple[int, float, float, bool, bool]:
         include_last_month = st.toggle(
             "Учитывать последний месяц",
             value=True,
-            help="Если выключено, последний месяц в данных исключается из расчёта прогноза. Полезно, если месяц ещё не завершён.",
+            help="Если выключено, текущий календарный месяц полностью исключается из обучения. Тогда прогноз начинается с текущего месяца.",
         )
 
 
     return steps, iqr_factor, croston_threshold, show_clean, include_last_month
-
 
 
 def render_metrics(result: GroupForecastResult) -> None:
@@ -192,7 +192,6 @@ def render_metrics(result: GroupForecastResult) -> None:
     c5.metric(f"Ремонт ({n_months} мес.)", f"{summary['repair_total']:,.1f}")
     c6.metric("Итого спрос", f"{summary['total_demand']:,.1f}")
     c7.metric("Нужно заказать", f"{summary['need_to_order']:,.1f}")
-
 
 
 def render_table(result: GroupForecastResult) -> None:

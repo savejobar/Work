@@ -9,6 +9,7 @@ import pandas as pd
 import streamlit as st
 
 from forecasting.runner import MONTH_RU
+from readers.excel_safety import sanitize_excel_dataframe
 
 
 def render_sidebar() -> pd.DataFrame | None:
@@ -51,8 +52,9 @@ def render_sidebar() -> pd.DataFrame | None:
             st.divider()
 
             if "processed_excel" not in st.session_state:
+                safe_df = sanitize_excel_dataframe(df)
                 buf = io.BytesIO()
-                df.to_excel(buf, index=False, engine="openpyxl")
+                safe_df.to_excel(buf, index=False, engine="openpyxl")
                 buf.seek(0)
                 st.session_state["processed_excel"] = buf.getvalue()
 

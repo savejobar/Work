@@ -6,6 +6,7 @@ import openpyxl
 from openpyxl.drawing.image import Image as XLImage
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
+from readers.excel_safety import sanitize_excel_value
 
 def build_batch_excel(results: list, show_clean: bool = True) -> bytes:
     """
@@ -22,7 +23,7 @@ def build_batch_excel(results: list, show_clean: bool = True) -> bytes:
     brd = Border(left=thin, right=thin, top=thin, bottom=thin)
 
     def write_cell(ws, r, c, v, bold=False, bg=None, align="center", fmt=None, color="000000"):
-        cell = ws.cell(row=r, column=c, value=v)
+        cell = ws.cell(row=r, column=c, value=sanitize_excel_value(v))
         cell.font = Font(name="Calibri", bold=bold, color=color, size=10)
         cell.alignment = Alignment(horizontal=align, vertical="center", wrap_text=True)
         cell.border = brd
@@ -30,6 +31,7 @@ def build_batch_excel(results: list, show_clean: bool = True) -> bytes:
             cell.fill = PatternFill("solid", fgColor=bg)
         if fmt:
             cell.number_format = fmt
+
 
     fc_months = results[0].fc_months
     month_labels = [f"{MONTH_RU[m]} {y}" for y, m in fc_months]
