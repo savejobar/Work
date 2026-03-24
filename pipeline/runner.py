@@ -305,6 +305,6 @@ def run_full_pipeline(
     )
     final["Номенклатура"] = final["Номер группы"].map(name_map)
 
-    df = fill_flow_columns(df, ["Продажа", "Ремонт"])
+    df = fill_flow_columns(final, ["Продажа", "Ремонт"])
 
     return df
