@@ -28,6 +28,7 @@ STOCK_COLS  = [
     "Номенклатура", 
     "Артикул", 
     "Оригинальный номер",
+    "Приход",
     "Расход",
     "Конечный остаток"
     ]
@@ -176,8 +177,18 @@ def preprocess_stock_report(file_path: str) -> pd.DataFrame:
 
     df = df.loc[df["Артикул"].notna() | df["Оригинальный номер"].notna()]
 
-    for col in ["Расход", "Приход", "Конечный остаток"]:
+    for col in ["Расход", "Приход", "Конечный остаток", "Начальный остаток"]:
         df[col] = df[col].str.replace(",", "", regex=False).astype(float)
         df.loc[df[col] < 0, col] = 0
+        
+        if  col != 'Конечный остаток':
+            df[col] = df[col].fillna(0)
+    
+    mask = df["Конечный остаток"].isna()
+    df.loc[mask, "Конечный остаток"] = (
+        df.loc[mask, "Начальный остаток"]
+        + df.loc[mask, "Приход"]
+        - df.loc[mask, "Расход"]
+    )
 
     return df[STOCK_COLS]

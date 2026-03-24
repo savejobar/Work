@@ -1,3 +1,4 @@
+import pandas as pd
 import streamlit as st
 
 st.set_page_config(
@@ -19,10 +20,34 @@ from app.charts import render_chart
 from forecasting.runner import run_group_forecast
 from readers.exporters import build_batch_excel
 from app.logger import SessionLogger
+
+
+def apply_last_month_policy(df: pd.DataFrame, include_last_month: bool) -> pd.DataFrame:
+    """
+    Возвращает рабочий DataFrame для прогноза.
+    Если include_last_month=False, исключает глобально последний месяц из данных.
+    """
+    if include_last_month or df.empty:
+        return df
+
+    last_year = int(df["Год"].max())
+    last_month = int(df.loc[df["Год"] == last_year, "Месяц"].max())
+
+    return df.loc[
+        ~((df["Год"] == last_year) & (df["Месяц"] == last_month))
+    ].copy()
+
 log = SessionLogger()
 
 @st.fragment
-def download_section(results, show_clean: bool, steps: int, iqr_factor: float, croston_threshold: float):
+def download_section(
+    results,
+    show_clean: bool,
+    steps: int,
+    iqr_factor: float,
+    croston_threshold: float,
+    include_last_month: bool,
+):
     dataset_version = st.session_state.get("dataset_version", "no_dataset")
     results_key = (
         str(dataset_version)
@@ -31,6 +56,7 @@ def download_section(results, show_clean: bool, steps: int, iqr_factor: float, c
         + str(steps)
         + str(iqr_factor)
         + str(croston_threshold)
+        + str(include_last_month)
     )
 
     if "batch_excel" not in st.session_state or st.session_state.get("batch_key") != results_key:
@@ -44,6 +70,7 @@ def download_section(results, show_clean: bool, steps: int, iqr_factor: float, c
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         type="primary",
     )
+
 
 
 st.title("Прогноз спроса на запасные части")
@@ -98,14 +125,19 @@ if df is None:
     st.stop()
 
 # Параметры прогноза
+steps, iqr_factor, croston_threshold, show_clean, include_last_month = render_params()
 
-steps, iqr_factor, croston_threshold, show_clean = render_params()
+# Рабочий DataFrame для прогноза
+df_work = apply_last_month_policy(df, include_last_month)
+
+if df_work.empty:
+    st.error("После исключения последнего месяца данных для прогноза не осталось")
+    st.stop()
 
 st.divider()
 
 # Поиск запчасти
-
-group_ids = render_search(df)
+group_ids = render_search(df_work)
 
 if not group_ids:
     st.info("Введите артикул для построения прогноза")
@@ -120,6 +152,7 @@ forecast_key = (
     + str(steps)
     + str(iqr_factor)
     + str(croston_threshold)
+    + str(include_last_month)
 )
 
 if "forecast_results" not in st.session_state or st.session_state.get("forecast_key") != forecast_key:
@@ -131,18 +164,19 @@ if "forecast_results" not in st.session_state or st.session_state.get("forecast_
     for i, group_id in enumerate(group_ids):
         try:
             if is_batch:
-                meta = df[df["Номер группы"] == group_id].iloc[0]
+                meta = df_work[df_work["Номер группы"] == group_id].iloc[0]
                 progress.progress(
                     int((i / len(group_ids)) * 100),
                     text=f"Обрабатываем: {str(meta['Номенклатура'])[:50]}...",
                 )
             result = run_group_forecast(
-                df,
+                df_work,
                 group_id=group_id,
                 steps=steps,
                 iqr_factor=iqr_factor,
                 croston_threshold=croston_threshold,
             )
+
             results.append(result)
             log.info(f"Прогноз группы {group_id} | {result.nomenclature[:40]} | продажи={result.sale.method} | ремонт={result.repair.method}")
         except Exception as e:
@@ -165,9 +199,18 @@ if not results:
 
 # Вывод результатов
 if is_batch:
-    download_section(results, show_clean=show_clean, steps=steps, iqr_factor=iqr_factor, croston_threshold=croston_threshold)
+    download_section(
+        results,
+        show_clean=show_clean,
+        steps=steps,
+        iqr_factor=iqr_factor,
+        croston_threshold=croston_threshold,
+        include_last_month=include_last_month,
+    )
+
     st.markdown("### Сводная таблица")
     render_summary_table(results)
+
 else:
     result = results[0]
     st.markdown(f"### {result.nomenclature}")

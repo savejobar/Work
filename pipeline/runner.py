@@ -12,6 +12,7 @@ from features.aggregation import (
 from preprocessing.cleaning import (
     normalize_nomenclatures_repair_parts,
     normalize_nomenclatures_stock_report,
+    fill_missing_article,
 )
 from preprocessing.grouping import (
     build_analog_graph,
@@ -105,6 +106,16 @@ def run_full_pipeline(
         "Номенклатура.Оригинальный номер расширенный",
     ]:
         df1[col] = df1[col].apply(normalize)
+    
+    df1 = fill_missing_article(df1, "Номенклатура.Артикул", "Номенклатура.Оригинальный номер")
+    
+    mask_df1 = (
+    df1["Номенклатура.Артикул"].isna()
+    & df1["Номенклатура.Оригинальный номер"].notna()
+    )
+    df1.loc[mask_df1, "Номенклатура.Артикул"] = df1.loc[
+        mask_df1, "Номенклатура.Оригинальный номер"
+    ]
 
     df1["Номенклатура.Оригинальный номер расширенный"] = df1.apply(
         consolidate_extended_article_numbers, axis=1
@@ -134,6 +145,11 @@ def run_full_pipeline(
 
     df2["Артикул"] = df2["Артикул"].apply(normalize)
     df2["Оригинальный номер"] = df2["Оригинальный номер"].apply(normalize)
+    df2 = fill_missing_article(df2, "Артикул", "Оригинальный номер")
+
+    mask_df2 = df2["Артикул"].isna() & df2["Оригинальный номер"].notna()
+    df2.loc[mask_df2, "Артикул"] = df2.loc[mask_df2, "Оригинальный номер"]
+
 
     article_to_group, article_to_analogs = _build_article_lookup(df1)
 
@@ -275,9 +291,9 @@ def run_full_pipeline(
 
     meta_order = [
         c for c in final.columns
-        if c not in ["Продажа", "Ремонт", "Конечный остаток"]
+        if c not in ["Приход", "Продажа", "Ремонт", "Конечный остаток"]
     ]
-    final = final[meta_order + ["Конечный остаток", "Продажа", "Ремонт"]]
+    final = final[meta_order + ["Приход", "Продажа", "Ремонт", "Конечный остаток"]]
 
     final = normalize_analog_lists(
         final, col_group="Номер группы", col_analogs="Список аналогов"
@@ -289,6 +305,6 @@ def run_full_pipeline(
     )
     final["Номенклатура"] = final["Номер группы"].map(name_map)
 
-    df = fill_missing_months(final)
+    df = fill_flow_columns(df, ["Продажа", "Ремонт"])
 
     return df

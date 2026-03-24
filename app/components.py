@@ -128,19 +128,20 @@ def render_search(df: pd.DataFrame) -> list[int] | None:
     return group_ids if group_ids else None
 
 
-def render_params() -> tuple[int, float, float, bool]:
+def render_params() -> tuple[int, float, float, bool, bool]:
     """
     Блок параметров прогноза.
     """
     st.markdown("### Параметры прогноза")
 
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, gap1, col4, gap2, col5 = st.columns([1, 1, 1, 0.2, 0.8, 0.2, 1])
 
     with col1:
         steps = st.slider(
             "Горизонт (мес)", min_value=1, max_value=12, value=3,
             help="Количество месяцев вперёд для прогноза",
         )
+
     with col2:
         iqr_factor = st.slider(
             "IQR ×", min_value=1.0, max_value=5.0, value=1.5, step=0.1,
@@ -148,20 +149,32 @@ def render_params() -> tuple[int, float, float, bool]:
         )
         no_outliers = st.toggle("Не удалять выбросы", value=True)
         if no_outliers:
-            iqr_factor = NO_OUTLIER_REMOVAL 
+            iqr_factor = NO_OUTLIER_REMOVAL
+
     with col3:
         croston_threshold = st.slider(
             "Порог нулей для TSB", min_value=0.1, max_value=0.8,
             value=0.40, step=0.05,
             help="Если доля нулей в серии выше порога — применяется TSB/Croston",
         )
+
     with col4:
         show_clean = st.toggle(
-            "Показать очищенный ряд", value=True,
+            "Показать очищенный ряд",
+            value=True,
             help="Отображать серию после замены выбросов",
         )
 
-    return steps, iqr_factor, croston_threshold, show_clean
+    with col5:
+        include_last_month = st.toggle(
+            "Учитывать последний месяц",
+            value=True,
+            help="Если выключено, последний месяц в данных исключается из расчёта прогноза. Полезно, если месяц ещё не завершён.",
+        )
+
+
+    return steps, iqr_factor, croston_threshold, show_clean, include_last_month
+
 
 
 def render_metrics(result: GroupForecastResult) -> None:

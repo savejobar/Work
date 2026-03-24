@@ -5,6 +5,22 @@ from preprocessing.corrections import apply_corrections
 from preprocessing.normalization import extract_articles
 
 
+def fill_missing_article(df: pd.DataFrame, art_col: str, orig_col: str) -> pd.DataFrame:
+    """
+    Подставляет `orig_col` в `art_col` для строк, где `art_col` пуст.
+
+    Нужен для унификации идентификатора позиции перед дальнейшей
+    группировкой и агрегацией. Возвращает копию DataFrame.
+    """
+    df = df.copy()
+    mask = (
+        df[orig_col].notna()
+        & df[art_col].fillna("").str.strip().eq("")
+    )
+    df.loc[mask, art_col] = df.loc[mask, orig_col]
+    return df
+
+
 def _split_complects(
         df: pd.DataFrame,
         art_col: str,
@@ -90,6 +106,8 @@ def normalize_nomenclatures_repair_parts(df: pd.DataFrame) -> pd.DataFrame:
         .apply(lambda x: x.str.strip())
     )
 
+    df
+
     df = _split_complects(
         df,
         art_col="Номенклатура.Артикул",
@@ -98,6 +116,7 @@ def normalize_nomenclatures_repair_parts(df: pd.DataFrame) -> pd.DataFrame:
     )
 
     return df
+
 
 
 def normalize_nomenclatures_stock_report(df: pd.DataFrame) -> pd.DataFrame:
