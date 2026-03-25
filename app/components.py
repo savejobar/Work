@@ -5,10 +5,9 @@ import pandas as pd
 import streamlit as st
 
 from forecasting.runner import GroupForecastResult, build_result_summary, forecast_table
+from readers.loaders import validate_upload_size
 
-NO_OUTLIER_REMOVAL = float('inf')
-
-
+ 
 def render_search(df: pd.DataFrame) -> list[int] | None:
     """
     Возвращает список номеров групп или None.
@@ -78,6 +77,7 @@ def render_search(df: pd.DataFrame) -> list[int] | None:
                 return None
 
             try:
+                validate_upload_size(uploaded, "Список артикулов", max_bytes=5 * 1024 * 1024)
                 arts_df = pd.read_excel(uploaded, dtype=str, engine="calamine")
             except Exception as e:
                 st.session_state["submitted_articles"] = None
@@ -95,12 +95,15 @@ def render_search(df: pd.DataFrame) -> list[int] | None:
                 st.error("В файле нет колонки 'Артикул'")
                 return None
 
-            st.session_state["submitted_articles"] = [
+            articles = [
                 a
                 for a in arts_df[article_col].dropna().str.strip().tolist()
                 if a
             ]
-            st.caption(f"Загружено артикулов: {len(st.session_state['submitted_articles'])}")
+            articles = list(dict.fromkeys(articles))
+
+            st.session_state["submitted_articles"] = articles
+            st.caption(f"Загружено артикулов: {len(articles)}")
 
     articles = st.session_state.get("submitted_articles")
     if not articles:
@@ -146,52 +149,61 @@ def render_search(df: pd.DataFrame) -> list[int] | None:
     return group_ids if group_ids else None
 
 
-def render_params() -> tuple[int, float, float, bool, bool]:
+def render_params() -> tuple[int, float | None, float, bool, bool]:
     """
     Блок параметров прогноза.
     """
     st.markdown("### Параметры прогноза")
 
-    col1, col2, col3, gap1, col4, gap2, col5 = st.columns([1, 1, 1, 0.2, 0.8, 0.2, 1])
+    no_outliers = st.session_state.get("no_outliers", True)
+
+    col1, col2, col3, gap1, col4, gap2, col5 = st.columns(
+        [1, 1, 1, 0.3, 0.9, 0.1, 1.2],
+        vertical_alignment="bottom",
+    )
 
     with col1:
         steps = st.slider(
             "Горизонт (мес)", min_value=1, max_value=12, value=3,
             help="Количество месяцев вперёд для прогноза",
         )
-
     with col2:
-        iqr_factor = st.slider(
+        iqr_slider_value = st.slider(
             "IQR ×", min_value=1.0, max_value=5.0, value=1.5, step=0.1,
-            help="Определяет чувствительность к выбросам. Малое значение — больше точек удаляется. Влияет на стабильность прогноза."
+            help="Определяет чувствительность к выбросам. Малое значение — больше точек удаляется. Влияет на стабильность прогноза.",
+            disabled=no_outliers,
+            key="iqr_factor_slider",
         )
-        no_outliers = st.toggle("Не удалять выбросы", value=True)
-        if no_outliers:
-            iqr_factor = NO_OUTLIER_REMOVAL
-
     with col3:
         croston_threshold = st.slider(
             "Порог нулей для TSB", min_value=0.1, max_value=0.8,
             value=0.40, step=0.05,
             help="Если доля нулей в серии выше порога — применяется TSB",
         )
-
     with col4:
         show_clean = st.toggle(
             "Показать очищенный ряд",
             value=True,
             help="Отображать серию после замены выбросов",
         )
-
     with col5:
-        include_last_month = st.toggle(
-            "Учитывать последний месяц",
+        include_current_month = st.toggle(
+            "Учитывать текущий календарный месяц",
             value=True,
-            help="Если выключено, текущий календарный месяц полностью исключается из рассмотрения. Тогда прогноз начинается с текущего месяца.",
+            help="Если выключено, из расчёта исключается текущий календарный месяц по системной дате. Это полезно, если месяц ещё не завершён и данные неполные.",
         )
 
+    sub1, sub2, sub3, gap_sub1, sub4, gap_sub2, sub5 = st.columns([1, 1, 1, 0.2, 0.9, 0.2, 1.2])
+    with sub2:
+        no_outliers = st.toggle(
+            "Не удалять выбросы",
+            value=True,
+            key="no_outliers",
+        )
 
-    return steps, iqr_factor, croston_threshold, show_clean, include_last_month
+    iqr_factor = None if no_outliers else iqr_slider_value
+
+    return steps, iqr_factor, croston_threshold, show_clean, include_current_month
 
 
 def render_metrics(result: GroupForecastResult) -> None:

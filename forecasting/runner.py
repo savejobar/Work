@@ -289,7 +289,7 @@ def run_group_forecast(
     train_end_month: int,
     forecast_start: pd.Timestamp,
     steps: int = 3,
-    iqr_factor: float = 1.5,
+    iqr_factor: float | None = 1.5,
     croston_threshold: float = 0.40,
 ) -> GroupForecastResult:
     """

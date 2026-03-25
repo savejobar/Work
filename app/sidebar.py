@@ -10,32 +10,7 @@ import pandas as pd
 import streamlit as st
 
 from forecasting.runner import MONTH_RU
-from readers.loaders import sanitize_excel_dataframe
-
-
-MAX_UPLOAD_BYTES = 50 * 1024 * 1024 
-
-
-def _uploaded_size(uploaded_file: Any) -> int:
-    """
-    Возвращает размер загруженного файла в байтах.
-    """
-    size = getattr(uploaded_file, "size", None)
-    if size is not None:
-        return int(size)
-    return len(uploaded_file.getbuffer())
-
-
-def _validate_upload_size(uploaded_file: Any, label: str) -> None:
-    """
-    Проверяет, что размер загруженного файла не превышает допустимый лимит.
-    """
-    size = _uploaded_size(uploaded_file)
-    if size > MAX_UPLOAD_BYTES:
-        raise ValueError(
-            f"{label}: файл слишком большой ({size / 1024 / 1024:.1f} MB). "
-            f"Лимит: {MAX_UPLOAD_BYTES / 1024 / 1024:.0f} MB."
-        )
+from readers.loaders import sanitize_excel_dataframe, validate_upload_size
     
 
 def _clear_search_state() -> None:
@@ -128,8 +103,8 @@ def _run_pipeline(f1, f2) -> None:
     log = SessionLogger()
 
     try:
-        _validate_upload_size(f1, "Запчасти списанные в ремонт")
-        _validate_upload_size(f2, "Остатки и обороты")
+        validate_upload_size(f1, "Запчасти списанные в ремонт")
+        validate_upload_size(f2, "Остатки и обороты")
     except ValueError as e:
         st.error(str(e))
         return

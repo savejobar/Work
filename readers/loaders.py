@@ -36,6 +36,30 @@ STOCK_COLS  = [
 
 DANGEROUS_EXCEL_PREFIXES: tuple[str, ...] = ("=", "+", "-", "@")
 
+MAX_UPLOAD_BYTES: int = 50 * 1024 * 1024 
+
+
+def _uploaded_size(uploaded_file: Any) -> int:
+    """
+    Возвращает размер загруженного файла в байтах.
+    """
+    size = getattr(uploaded_file, "size", None)
+    if size is not None:
+        return int(size)
+    return len(uploaded_file.getbuffer())
+
+
+def validate_upload_size(uploaded_file: Any, label: str) -> None:
+    """
+    Проверяет, что размер загруженного файла не превышает допустимый лимит.
+    """
+    size = _uploaded_size(uploaded_file)
+    if size > MAX_UPLOAD_BYTES:
+        raise ValueError(
+            f"{label}: файл слишком большой ({size / 1024 / 1024:.1f} MB). "
+            f"Лимит: {MAX_UPLOAD_BYTES / 1024 / 1024:.0f} MB."
+        )
+    
 
 def load_config(file_name: str) -> dict:
     """

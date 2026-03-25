@@ -61,19 +61,28 @@ def _get_console_logger() -> logging.Logger:
 def _write_log(level: str, message: str, user: str) -> None:
     """
     Записывает строку лога в Google Sheets.
-    При ошибке пишет в консоль — не прерывает работу приложения.
+    При временной ошибке один раз сбрасывает кэш sheet и повторяет запись.
     """
+    row = [
+        datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
+        user,
+        level,
+        message,
+    ]
+
     try:
         sheet = _get_sheet()
-        sheet.append_row([
-            datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
-            user,
-            level,
-            message,
-        ])
-    except Exception as e:
-        _get_console_logger().error(f"Logging failed: {e}")
-
+        sheet.append_row(row)
+    except Exception:
+        try:
+            _get_sheet.clear()
+            sheet = _get_sheet()
+            sheet.append_row(row)
+        except Exception as second_error:
+            _get_console_logger().error(
+                f"Logging failed after retry: {second_error}"
+            )
+            
 
 class SessionLogger:
     """
