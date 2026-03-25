@@ -235,7 +235,7 @@ def build_result_summary(result: GroupForecastResult) -> dict[str, float]:
 
 
 def find_groups_by_article(df: pd.DataFrame, article: str) -> list[dict]:
-    article_up = article.strip().upper()
+    article_up = str(article).strip().upper()
     if not article_up:
         return []
 
