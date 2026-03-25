@@ -13,6 +13,22 @@ from forecasting.runner import MONTH_RU
 from readers.loaders import sanitize_excel_dataframe, validate_upload_size
     
 
+REPAIR_REQUIRED_RAW_COLS = [
+    "Дата",
+    "Номенклатура",
+    "Номенклатура.Артикул",
+    "Номенклатура.Оригинальный номер",
+    "Номенклатура.Оригинальный номер расширенный",
+    "Машина",
+]
+
+STOCK_REQUIRED_RAW_COLS = [
+    "Номенклатура",
+    "Артикул",
+    "Оригинальный номер",
+]
+
+
 def _clear_search_state() -> None:
     """
     Сбрасывает состояние поиска при загрузке нового датасета.
@@ -42,15 +58,34 @@ def render_sidebar() -> pd.DataFrame | None:
     with st.sidebar:
         st.markdown("## Источники данных")
 
+        with st.expander("Требования к файлам", expanded=False):
+            st.markdown("**Запчасти списанные в ремонт**")
+            st.caption("Обязательные поля в исходном файле:")
+            st.code("\n".join(REPAIR_REQUIRED_RAW_COLS), language="text")
+
+            st.markdown("**Остатки и обороты**")
+            st.caption("Обязательные поля в исходном файле:")
+            st.code("\n".join(STOCK_REQUIRED_RAW_COLS), language="text")
+            st.markdown("В отчете остатков обязательна группировка по годам и по месяцам.")
+
+            st.warning(
+                "Не забудьте предобработать оба файла, приведя их к текстовому формату в Excel. "
+                "С другими колонками или другой структурой будет ошибка."
+            )
+
+        st.markdown("**Отчет: Запчасти списанные в ремонт**")
         f1 = st.file_uploader(
             "Запчасти списанные в ремонт",
             type=["xlsx", "xls"],
             key="repair_file",
+            label_visibility="collapsed",
         )
+        st.markdown("**Отчет: Остатки и обороты**")
         f2 = st.file_uploader(
             "Остатки и обороты",
             type=["xlsx", "xls"],
             key="stock_file",
+            label_visibility="collapsed",
         )
 
         st.divider()
