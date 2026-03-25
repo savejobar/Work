@@ -140,7 +140,6 @@ def _get_series(
 def _draw_panel(
     ax: plt.Axes,
     fc_result: ForecastResult,
-    fc_months: list[tuple[int, int]],
     title: str,
     show_clean: bool,
 ) -> None:
@@ -211,10 +210,11 @@ class GroupForecastResult:
     group_id: int
     article: str
     nomenclature: str
+    analogs: str
     sale: ForecastResult
     repair: ForecastResult
     fc_months: list[tuple[int, int]]
-    ending_stock: float = 0.0 
+    ending_stock: float = 0.0
 
 
 def build_result_summary(result: GroupForecastResult) -> dict[str, float]:
@@ -303,6 +303,15 @@ def run_group_forecast(
     meta_row = grp.iloc[0]
     nomenclature = str(meta_row["Номенклатура"])[:80]
     article_out = str(meta_row["Артикул"])
+    raw_analogs = meta_row.get("Список аналогов")
+
+    if isinstance(raw_analogs, tuple):
+        analogs_out = ", ".join(str(x) for x in raw_analogs if pd.notna(x))
+    elif pd.notna(raw_analogs):
+        analogs_out = str(raw_analogs)
+    else:
+        analogs_out = ""
+
     grp_monthly = _build_monthly_group_frame(grp, group_id, train_end_year, train_end_month)
 
     natural_start = _month_start(*_next_months(train_end_year, train_end_month, 1)[0])
@@ -345,6 +354,7 @@ def run_group_forecast(
         group_id=group_id,
         article=article_out,
         nomenclature=nomenclature,
+        analogs=analogs_out,
         sale=sale_result,
         repair=repair_result,
         fc_months=fc_months,
@@ -390,7 +400,7 @@ def plot_forecast(
         f"{result.nomenclature}\nАртикул: {result.article}  |  Группа: {result.group_id}",
         fontsize=12, fontweight="bold",
     )
-    _draw_panel(axes[0], result.sale, result.fc_months, "Продажи", show_clean)
-    _draw_panel(axes[1], result.repair, result.fc_months, "Ремонт", show_clean)
+    _draw_panel(axes[0], result.sale, "Продажи", show_clean)
+    _draw_panel(axes[1], result.repair, "Ремонт", show_clean)
     fig.tight_layout()
     return fig

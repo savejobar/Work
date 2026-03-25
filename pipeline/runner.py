@@ -87,6 +87,19 @@ def _enrich_analogs(
     return analogs
 
 
+def _drop_rows_without_identifiers(
+    df: pd.DataFrame,
+    article_col: str,
+    original_col: str,
+) -> pd.DataFrame:
+    """
+    Удаляет строки, где после нормализации не осталось ни одного идентификатора.
+    """
+    return df.loc[
+        df[article_col].notna() | df[original_col].notna()
+    ].copy()
+
+
 def _sync_group_membership(
     df1: pd.DataFrame,
     df2: pd.DataFrame,
@@ -151,6 +164,11 @@ def run_full_pipeline(
         df1[col] = df1[col].apply(normalize)
     
     df1 = fill_missing_article(df1, "Номенклатура.Артикул", "Номенклатура.Оригинальный номер")
+    df1 = _drop_rows_without_identifiers(
+        df1,
+        "Номенклатура.Артикул",
+        "Номенклатура.Оригинальный номер",
+    )
 
     df1["Номенклатура.Оригинальный номер расширенный"] = df1.apply(
         consolidate_extended_article_numbers, axis=1
@@ -181,6 +199,7 @@ def run_full_pipeline(
     df2["Артикул"] = df2["Артикул"].apply(normalize)
     df2["Оригинальный номер"] = df2["Оригинальный номер"].apply(normalize)
     df2 = fill_missing_article(df2, "Артикул", "Оригинальный номер")
+    df2 = _drop_rows_without_identifiers(df2, "Артикул", "Оригинальный номер")
 
     article_to_group, article_to_analogs = _build_article_lookup(df1)
 
@@ -330,6 +349,12 @@ def run_full_pipeline(
         .apply(lambda s: min(s.dropna().astype(str), key=len, default=None))
     )
     final["Номенклатура"] = final["Номер группы"].map(name_map)
+
+    article_map = (
+    final.groupby("Номер группы")["Артикул"]
+    .apply(lambda s: max(s.dropna().astype(str), key=len, default=None))
+    )
+    final["Артикул"] = final["Номер группы"].map(article_map)
 
     df = fill_flow_columns(final, ["Продажа", "Ремонт"])
 

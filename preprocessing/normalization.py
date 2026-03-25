@@ -34,33 +34,42 @@ def normalize(val: Any) -> str | None:
 def article_forms(val: Any) -> list[str]:
     """
     Возвращает все «формы» артикула: оригинал + варианты без суффиксов/префиксов
-    + вариант без ведущих нулей.
-
-    Используется при построении графа аналогов — артикулы, которые
-    отличаются только суффиксом/префиксом, считаются связанными.
+    + варианты без ведущих нулей.
     """
     base = normalize(val)
     if base is None:
         return []
 
-    forms = [base]
+    forms: list[str] = []
+    seen: set[str] = set()
 
-    # убираем ведущие нули: "00773607100401010" → "773607100401010"
-    stripped = base.lstrip("0")
-    if stripped and stripped != base and stripped[0] not in "-/. _":
-        forms.append(stripped)
+    def add_form(candidate: str | None) -> None:
+        if not candidate:
+            return
+
+        candidate = candidate.strip()
+        if not candidate or candidate in seen:
+            return
+
+        seen.add(candidate)
+        forms.append(candidate)
+
+        stripped = candidate.lstrip("0")
+        if stripped and stripped != candidate and stripped[0] not in "-/. _" and stripped not in seen:
+            seen.add(stripped)
+            forms.append(stripped)
+
+    add_form(base)
 
     for suf in ANALOG_SUFFIXES:
         if base.endswith(suf) and len(base) > len(suf):
             root = base[: -len(suf)].rstrip()
-            if root and root not in forms:
-                forms.append(root)
+            add_form(root)
 
     for pre in ANALOG_PREFIXES:
         if base.startswith(pre) and len(base) > len(pre):
             root = base[len(pre):].lstrip()
-            if root and root not in forms:
-                forms.append(root)
+            add_form(root)
 
     return forms
 

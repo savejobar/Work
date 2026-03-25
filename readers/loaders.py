@@ -1,6 +1,5 @@
 import json
 import os
-
 import pandas as pd
 from typing import Any
 
@@ -23,7 +22,7 @@ REPAIR_COLS = [
     "Количество"
     ]
 
-STOCK_COLS  = [
+STOCK_COLS = [
     "Год",
     "Месяц",
     "Номенклатура", 
@@ -49,15 +48,16 @@ def _uploaded_size(uploaded_file: Any) -> int:
     return len(uploaded_file.getbuffer())
 
 
-def validate_upload_size(uploaded_file: Any, label: str) -> None:
+def validate_upload_size(uploaded_file: Any, label: str, max_bytes: int | None = None) -> None:
     """
     Проверяет, что размер загруженного файла не превышает допустимый лимит.
     """
+    limit = MAX_UPLOAD_BYTES if max_bytes is None else max_bytes
     size = _uploaded_size(uploaded_file)
-    if size > MAX_UPLOAD_BYTES:
+    if size > limit:
         raise ValueError(
             f"{label}: файл слишком большой ({size / 1024 / 1024:.1f} MB). "
-            f"Лимит: {MAX_UPLOAD_BYTES / 1024 / 1024:.0f} MB."
+            f"Лимит: {limit / 1024 / 1024:.0f} MB."
         )
     
 
@@ -239,7 +239,7 @@ def preprocess_stock_report(file_path: str) -> pd.DataFrame:
         df[col] = df[col].str.replace(",", "", regex=False).astype(float)
         df.loc[df[col] < 0, col] = 0
         
-        if  col != 'Конечный остаток':
+        if col != 'Конечный остаток':
             df[col] = df[col].fillna(0)
     
     mask = df["Конечный остаток"].isna()
@@ -248,5 +248,5 @@ def preprocess_stock_report(file_path: str) -> pd.DataFrame:
         + df.loc[mask, "Приход"]
         - df.loc[mask, "Расход"]
     )
-
+   
     return df[STOCK_COLS]

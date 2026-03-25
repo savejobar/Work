@@ -19,7 +19,19 @@ def aggregate_repair_groups(df: pd.DataFrame) -> pd.DataFrame:
 
     meta = (
         df.groupby("Номер группы", as_index=False)
-        .agg(Номенклатура=("Номенклатура", shortest_value))
+        .agg(
+            Номенклатура=("Номенклатура", shortest_value),
+            Список_аналогов=(
+                "all_analogs",
+                lambda x: max(
+                    (v for v in x.dropna() if isinstance(v, tuple)),
+                    key=len,
+                    default=None,
+                ),
+            ),
+            Артикул=("Номенклатура.Артикул", shortest_value),
+        )
+        .rename(columns={"Список_аналогов": "Список аналогов"})
     )
 
     qty = (
