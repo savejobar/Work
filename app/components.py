@@ -48,7 +48,7 @@ def render_search(df: pd.DataFrame) -> list[int] | None:
                 )
 
             with col_btn:
-                submitted = st.form_submit_button("Найти", use_container_width=True)
+                submitted = st.form_submit_button("Прогноз", use_container_width=True)
 
     else:
         with st.form("article_search_form_file", border=False):
@@ -57,7 +57,7 @@ def render_search(df: pd.DataFrame) -> list[int] | None:
                 type=["xlsx", "xls"],
                 key="articles_file",
             )
-            submitted = st.form_submit_button("Найти", use_container_width=True)
+            submitted = st.form_submit_button("Прогноз", use_container_width=True)
 
     if submitted:
         if mode == "Одиночный":

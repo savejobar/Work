@@ -30,6 +30,7 @@ STOCK_COLS = [
     "Оригинальный номер",
     "Приход",
     "Расход",
+    'Код',
     "Конечный остаток"
     ]
 
@@ -188,7 +189,7 @@ def preprocess_repair_parts(file_path: str) -> pd.DataFrame:
     df["Год"] = df["Дата"].dt.year.astype("Int64")
     df["Месяц"] = df["Дата"].dt.month.astype("Int64")
 
-    df["Количество"] = df["Количество"].astype(float).astype(int)
+    df["Количество"] = df["Количество"].str.replace(',', '.').astype(float).astype(int)
 
     return df[REPAIR_COLS]
 
@@ -236,7 +237,9 @@ def preprocess_stock_report(file_path: str) -> pd.DataFrame:
     df = df.loc[df["Артикул"].notna() | df["Оригинальный номер"].notna()]
 
     for col in ["Расход", "Приход", "Конечный остаток", "Начальный остаток"]:
-        df[col] = df[col].str.replace(",", "", regex=False).astype(float)
+        df[col] = pd.to_numeric(
+        df[col].astype(str).str.replace(' ', '').str.replace(',', '.'),
+        errors='coerce')
         df.loc[df[col] < 0, col] = 0
         
         if col != 'Конечный остаток':

@@ -80,15 +80,15 @@ def aggregate_stock_groups(df: pd.DataFrame) -> pd.DataFrame:
         )
     )
 
-    stock_by_article = (
+    stock_by_code = (
         df
         .sort_values(
-            ["Номер группы", "Артикул", "Год", "Месяц", "_src_order"],
+            ["Номер группы", "Код", "Год", "Месяц", "_src_order"],
             kind="mergesort",
         )
-        .groupby(["Номер группы", "Артикул", "Год", "Месяц"], as_index=False)
+        .groupby(["Номер группы", "Код", "Год", "Месяц"], as_index=False)
         .tail(1)
-        [["Номер группы", "Артикул", "Год", "Месяц", "_ym", "Конечный остаток"]]
+        [["Номер группы", "Код", "Год", "Месяц", "_ym", "Конечный остаток"]]
     )
 
     all_months = (
@@ -99,8 +99,8 @@ def aggregate_stock_groups(df: pd.DataFrame) -> pd.DataFrame:
     )
 
     article_start = (
-        stock_by_article
-        .groupby(["Номер группы", "Артикул"], as_index=False)["_ym"]
+        stock_by_code
+        .groupby(["Номер группы", "Код"], as_index=False)["_ym"]
         .min()
         .rename(columns={"_ym": "_start_ym"})
     )
@@ -111,19 +111,20 @@ def aggregate_stock_groups(df: pd.DataFrame) -> pd.DataFrame:
     stock_grid = (
         stock_grid
         .merge(
-            stock_by_article[["Номер группы", "Артикул", "Год", "Месяц", "Конечный остаток"]],
-            on=["Номер группы", "Артикул", "Год", "Месяц"],
+            stock_by_code[["Номер группы", "Код", "Год", "Месяц", "Конечный остаток"]],
+            on=["Номер группы", "Код", "Год", "Месяц"],
             how="left",
         )
-        .sort_values(["Номер группы", "Артикул", "_ym"], kind="mergesort")
+        .sort_values(["Номер группы", "Код", "_ym"], kind="mergesort")
         .reset_index(drop=True)
     )
 
     stock_grid["Конечный остаток"] = (
         stock_grid
-        .groupby(["Номер группы", "Артикул"])["Конечный остаток"]
+        .groupby(["Номер группы", "Код"])["Конечный остаток"]
         .ffill()
     )
+
 
     stock = (
         stock_grid
