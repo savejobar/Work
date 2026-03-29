@@ -14,6 +14,11 @@ def shortest_value(series: pd.Series) -> str | None:
 def aggregate_repair_groups(df: pd.DataFrame) -> pd.DataFrame:
     """
     Агрегирует данные по группам аналогов (ремонт).
+
+    Ремонт:
+    - "Ремонт" — только по подъемникам, это идет в прогноз ремонта
+    - "Ремонт не подъемники" — внутреннее потребление по прочей технике
+    - "Ремонт всего" — сумма двух колонок, нужна для корректного расчета продаж
     """
     df = df.copy()
 
@@ -34,12 +39,27 @@ def aggregate_repair_groups(df: pd.DataFrame) -> pd.DataFrame:
         .rename(columns={"Список_аналогов": "Список аналогов"})
     )
 
+    df["Количество_подъемники"] = df["Количество"].where(df["Машина_подъемник"], 0)
+    df["Количество_неподъемники"] = df["Количество"].where(~df["Машина_подъемник"], 0)
+
     qty = (
         df.groupby(["Год", "Месяц", "Номер группы"], as_index=False)
-        .agg(Ремонт=("Количество", "sum"))
+        .agg(
+            Ремонт=("Количество_подъемники", "sum"),
+            **{
+                "Ремонт не подъемники": ("Количество_неподъемники", "sum"),
+                "Ремонт всего": ("Количество", "sum"),
+            },
+        )
     )
 
-    return qty.merge(meta, on="Номер группы", how="left")
+    res = qty.merge(meta, on="Номер группы", how="left")
+
+    for col in ["Ремонт", "Ремонт не подъемники", "Ремонт всего", "Номер группы"]:
+        if col in res.columns:
+            res[col] = res[col].apply(safe_to_int)
+
+    return res
 
 
 def aggregate_stock_groups(df: pd.DataFrame) -> pd.DataFrame:
@@ -151,16 +171,18 @@ def calculate_external_sales(
 ) -> pd.DataFrame:
     """
     Рассчитывает чистые внешние продажи:
-    Продажа = Расход (склад) − Ремонт (внутреннее потребление)
+
+    Продажа = Расход (склад) − Ремонт всего
     """
     merged = stock_agg.merge(
-        repair_agg[["Год", "Месяц", "Номер группы", "Ремонт"]],
+        repair_agg[["Год", "Месяц", "Номер группы", "Ремонт всего"]],
         on=["Год", "Месяц", "Номер группы"],
         how="left",
     )
-    merged["Продажа"] = merged["Расход"] - merged["Ремонт"].fillna(0)
 
-    return merged.drop(columns=["Расход", "Ремонт"])
+    merged["Продажа"] = merged["Расход"] - merged["Ремонт всего"].fillna(0)
+
+    return merged.drop(columns=["Расход", "Ремонт всего"])
 
 
 def fill_flow_columns(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:

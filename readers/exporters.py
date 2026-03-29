@@ -1,4 +1,6 @@
 import io
+from typing import Callable, Any
+
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -8,7 +10,11 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
 from readers.loaders import sanitize_excel_value
 
-def build_batch_excel(results: list, show_clean: bool = True) -> bytes:
+def build_batch_excel(
+    results: list,
+    show_clean: bool = True,
+    progress_callback: Callable[[int, int, Any], None] | None = None,
+) -> bytes:
     """
     Строит Excel с прогнозами для списка запчастей.
     """
@@ -93,7 +99,12 @@ def build_batch_excel(results: list, show_clean: bool = True) -> bytes:
 
     current_row = 2
 
-    for result in results:
+    total_results = len(results)
+
+    for idx, result in enumerate(results, start=1):
+        if progress_callback is not None:
+            progress_callback(idx, total_results, result)
+
         # Строка продаж
         zero_pct_sale = int(round(
             (result.sale.series_raw == 0).sum() / max(len(result.sale.series_raw), 1) * 100

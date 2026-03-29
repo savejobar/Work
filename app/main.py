@@ -1,13 +1,8 @@
 import pandas as pd
 from pathlib import Path
-import sys
 import streamlit as st
 
 _FAQ_PATH = Path(__file__).with_name("faq.md")
-_REPO_ROOT = Path(__file__).resolve().parents[1]
-
-if str(_REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(_REPO_ROOT))
 
 st.set_page_config(
     page_title="Прогноз запчастей",
@@ -52,30 +47,11 @@ def apply_current_month_policy(df: pd.DataFrame, include_current_month: bool) ->
 log = SessionLogger()
 
 @st.fragment
-def download_section(
-    results,
-    show_clean: bool,
-    steps: int,
-    iqr_factor: float | None,
-    croston_threshold: float,
-    include_current_month: bool,
-    forecast_anchor: str,
-):
-    dataset_version = st.session_state.get("dataset_version", "no_dataset")
-    results_key = (
-        str(dataset_version)
-        + str([r.group_id for r in results])
-        + str(show_clean)
-        + str(steps)
-        + str(iqr_factor)
-        + str(croston_threshold)
-        + str(include_current_month)
-        + str(forecast_anchor)
-    )
-
-    if "batch_excel" not in st.session_state or st.session_state.get("batch_key") != results_key:
-        st.session_state["batch_excel"] = build_batch_excel(results, show_clean=show_clean)
-        st.session_state["batch_key"] = results_key
+def download_section(results_key: str):
+    if "batch_excel" not in st.session_state:
+        return
+    if st.session_state.get("batch_key") != results_key:
+        return
 
     st.download_button(
         label="Скачать Excel с прогнозами",
@@ -115,7 +91,7 @@ if df_work.empty:
 st.divider()
 
 # Поиск запчасти
-group_ids = render_search(df_work)
+group_ids, progress_slot = render_search(df_work, include_current_month=include_current_month)
 
 if not group_ids:
     st.info("Введите артикул для построения прогноза")
@@ -135,23 +111,55 @@ forecast_key = (
     + str(include_current_month)
     + str(forecast_anchor)
 )
+batch_results_key = forecast_key + str(show_clean)
 
 if "forecast_results" in st.session_state and st.session_state.get("forecast_key") == forecast_key:
     results = st.session_state["forecast_results"]
+    if progress_slot is not None:
+        progress_slot.empty()
 else:
     results = []
     had_errors = False
-    train_end_year, train_end_month = _get_train_end(df_work)
-    group_frames = {
-        int(group_id): grp.sort_values(["Год", "Месяц"], kind="mergesort").copy()
-        for group_id, grp in (
-            df_work[df_work["Номер группы"].isin(group_ids)]
-            .groupby("Номер группы", sort=False)
-        )
-    }
+    st.session_state.pop("batch_excel", None)
+    st.session_state.pop("batch_key", None)
 
-    if is_batch:
-        progress = st.progress(0, text="Начинаем обработку...")
+    progress = None
+    if is_batch and progress_slot is not None:
+        progress = progress_slot.progress(
+            34,
+            text="Этап 2/3: Подготавливаем данные для прогноза...",
+        )
+
+    group_frames = {}
+    train_end_year, train_end_month = _get_train_end(df_work)
+
+    for i, group_id in enumerate(group_ids):
+        group_key = int(group_id)
+        grp = (
+            df_work[df_work["Номер группы"] == group_key]
+            .sort_values(["Год", "Месяц"], kind="mergesort")
+            .copy()
+        )
+        group_frames[group_key] = grp
+
+        if is_batch and progress is not None:
+            name = f"группа {group_id}"
+            if grp is not None and not grp.empty:
+                name = str(grp.iloc[0]["Номенклатура"])[:50]
+            pct = 34 + int(((i + 1) / max(len(group_ids), 1)) * 10)
+            progress.progress(
+                pct,
+                text=(
+                    f"Этап 2/3: Подготавливаем данные ({i + 1}/{len(group_ids)}) "
+                    f"— {name}..."
+                ),
+            )
+
+    if is_batch and progress is not None:
+        progress.progress(
+            45,
+            text=f"Этап 2/3: Прогнозируем группы (0/{len(group_ids)})...",
+        )
 
     for i, group_id in enumerate(group_ids):
         try:
@@ -160,11 +168,15 @@ else:
             if grp is None or grp.empty:
                 raise ValueError(f"Группа {group_id} не найдена")
 
-            if is_batch:
+            if is_batch and progress is not None:
                 meta = grp.iloc[0]
+                pct = 45 + int(((i + 1) / max(len(group_ids), 1)) * 35)
                 progress.progress(
-                    int((i / len(group_ids)) * 100),
-                    text=f"Обрабатываем: {str(meta['Номенклатура'])[:50]}...",
+                    pct,
+                    text=(
+                        f"Этап 2/3: Прогнозируем ({i + 1}/{len(group_ids)}) "
+                        f"— {str(meta['Номенклатура'])[:50]}..."
+                    ),
                 )
 
             result = run_group_forecast(
@@ -189,9 +201,35 @@ else:
             st.error(f"Ошибка для группы {group_id}: {e}")
             continue
 
-    if is_batch:
+    if results:
+        if is_batch and progress is not None:
+            progress.progress(81, text=f"Этап 3/3: Подготавливаем Excel-отчет (0/{len(results)})...")
+
+            def update_excel_progress(done: int, total: int, result) -> None:
+                label = str(result.nomenclature)[:50] if getattr(result, "nomenclature", None) else str(result.article)[:50]
+                pct = 81 + int((done / max(total, 1)) * 18)
+                progress.progress(
+                    pct,
+                    text=(
+                        f"Этап 3/3: Подготавливаем Excel-отчет ({done}/{total}) "
+                        f"— {label}..."
+                    ),
+                )
+        else:
+            update_excel_progress = None
+
+        st.session_state["batch_excel"] = build_batch_excel(
+            results,
+            show_clean=show_clean,
+            progress_callback=update_excel_progress,
+        )
+        st.session_state["batch_key"] = batch_results_key
+
+    if is_batch and progress is not None:
         progress.progress(100, text="Готово!")
         progress.empty()
+    elif progress_slot is not None:
+        progress_slot.empty()
 
     if not had_errors:
         st.session_state["forecast_results"] = results
@@ -202,15 +240,7 @@ if not results:
     st.stop()
 
 # Вывод результатов
-download_section(
-    results,
-    show_clean=show_clean,
-    steps=steps,
-    iqr_factor=iqr_factor,
-    croston_threshold=croston_threshold,
-    include_current_month=include_current_month,
-    forecast_anchor=forecast_anchor,
-)
+download_section(batch_results_key)
 
 if is_batch:
     st.markdown("### Сводная таблица")

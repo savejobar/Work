@@ -1,5 +1,6 @@
 from __future__ import annotations
 import re 
+from typing import Any
 
 import pandas as pd
 import streamlit as st
@@ -8,7 +9,10 @@ from forecasting.runner import GroupForecastResult, build_result_summary, foreca
 from readers.loaders import validate_upload_size
 
  
-def render_search(df: pd.DataFrame) -> list[int] | None:
+def render_search(
+    df: pd.DataFrame,
+    include_current_month: bool,
+) -> tuple[list[int] | None, Any]:
     """
     Возвращает список номеров групп или None.
     """
@@ -59,12 +63,16 @@ def render_search(df: pd.DataFrame) -> list[int] | None:
             )
             submitted = st.form_submit_button("Прогноз", use_container_width=True)
 
+    progress_slot = st.empty() if mode == "Списком" else None
+
     if submitted:
         if mode == "Одиночный":
             raw = st.session_state.get("article_input", "").strip()
             if not raw:
                 st.session_state["submitted_articles"] = None
-                return None
+                if progress_slot is not None:
+                    progress_slot.empty()
+                return None, progress_slot
 
             st.session_state["submitted_articles"] = [
                 a for a in re.split(r"[,\s]+", raw) if a
@@ -74,7 +82,9 @@ def render_search(df: pd.DataFrame) -> list[int] | None:
             if uploaded is None:
                 st.session_state["submitted_articles"] = None
                 st.caption("Файл должен содержать колонку 'Артикул'")
-                return None
+                if progress_slot is not None:
+                    progress_slot.empty()
+                return None, progress_slot
 
             try:
                 validate_upload_size(uploaded, "Список артикулов", max_bytes=5 * 1024 * 1024)
@@ -82,18 +92,25 @@ def render_search(df: pd.DataFrame) -> list[int] | None:
             except Exception as e:
                 st.session_state["submitted_articles"] = None
                 st.error(f"Ошибка чтения файла: {e}")
-                return None
+                if progress_slot is not None:
+                    progress_slot.empty()
+                return None, progress_slot
 
             normalized_cols = {
                 str(col).strip().casefold(): col
                 for col in arts_df.columns
             }
 
-            article_col = normalized_cols.get("артикул")
+            article_col = (
+            normalized_cols.get("артикул")
+            or normalized_cols.get("номенклатура.артикул")
+            )
             if article_col is None:
                 st.session_state["submitted_articles"] = None
                 st.error("В файле нет колонки 'Артикул'")
-                return None
+                if progress_slot is not None:
+                    progress_slot.empty()
+                return None, progress_slot
 
             articles = [
                 a
@@ -107,16 +124,55 @@ def render_search(df: pd.DataFrame) -> list[int] | None:
 
     articles = st.session_state.get("submitted_articles")
     if not articles:
-        return None
+        if progress_slot is not None:
+            progress_slot.empty()
+        return None, progress_slot
+
+    dataset_version = st.session_state.get("dataset_version", "no_dataset")
+    search_signature = (
+        str(dataset_version)
+        + str(mode)
+        + str(articles)
+        + str(include_current_month)
+    )
+
+    if st.session_state.get("search_lookup_signature") != search_signature:
+        progress = None
+        if progress_slot is not None:
+            progress = progress_slot.progress(
+                1,
+                text=f"Этап 1/3: Ищем группы по артикулам (0/{len(articles)})...",
+            )
+
+        search_results = []
+        not_found = []
+        for i, art in enumerate(articles, start=1):
+            hits = find_groups_by_article(df, art)
+            search_results.append({"article": art, "hits": hits})
+            if not hits:
+                not_found.append(art)
+
+            if progress is not None:
+                pct = max(1, int((i / max(len(articles), 1)) * 33))
+                progress.progress(
+                    pct,
+                    text=f"Этап 1/3: Ищем группы по артикулам ({i}/{len(articles)}) — {art}...",
+                )
+
+        st.session_state["search_lookup_signature"] = search_signature
+        st.session_state["search_lookup_results"] = search_results
+        st.session_state["search_not_found"] = not_found
+    else:
+        search_results = st.session_state.get("search_lookup_results", [])
+        not_found = st.session_state.get("search_not_found", [])
 
     group_ids = []
-    not_found = []
 
-    for i, art in enumerate(articles):
-        hits = find_groups_by_article(df, art)
+    for i, item in enumerate(search_results):
+        art = item["article"]
+        hits = item["hits"]
 
         if not hits:
-            not_found.append(art)
             continue
 
         if len(hits) == 1:
@@ -132,7 +188,6 @@ def render_search(df: pd.DataFrame) -> list[int] | None:
             f"Найдено несколько для '{art}':",
             options=list(option_map.keys()),
             format_func=lambda key: (
-                f"[{option_map[key]['Номер группы']}] "
                 f"{option_map[key]['Совпадение']} — "
                 f"{str(option_map[key]['Номенклатура'])[:50]}"
             ),
@@ -146,7 +201,7 @@ def render_search(df: pd.DataFrame) -> list[int] | None:
 
     group_ids = list(dict.fromkeys(group_ids))
 
-    return group_ids if group_ids else None
+    return (group_ids if group_ids else None), progress_slot
 
 
 def render_params() -> tuple[int, float | None, float, bool, bool]:
@@ -182,13 +237,13 @@ def render_params() -> tuple[int, float | None, float, bool, bool]:
         )
     with col4:
         show_clean = st.toggle(
-            "Показать очищенный ряд",
+            "Очищенный ряд",
             value=True,
             help="Отображать серию после замены выбросов",
         )
     with col5:
         include_current_month = st.toggle(
-            "Учитывать текущий календарный месяц",
+            "Текущий месяц",
             value=True,
             help="Если выключено, из расчёта исключается текущий календарный месяц по системной дате. Это полезно, если месяц ещё не завершён и данные неполные.",
         )

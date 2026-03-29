@@ -40,6 +40,9 @@ def _clear_search_state() -> None:
         "submitted_articles",
         "article_input",
         "articles_file",
+        "search_lookup_signature",
+        "search_lookup_results",
+        "search_not_found",
     ]
     for key in keys_to_drop:
         st.session_state.pop(key, None)
@@ -50,6 +53,17 @@ def _clear_search_state() -> None:
     ]
     for key in search_select_keys:
         st.session_state.pop(key, None)
+
+
+@st.cache_data(show_spinner=False)
+def build_processed_excel(df: pd.DataFrame) -> bytes:
+    safe_df = sanitize_excel_dataframe(df)
+    export_df = safe_df.rename(columns={"Ремонт": "Ремонт подъемников"})
+
+    buf = io.BytesIO()
+    export_df.to_excel(buf, index=False, engine="openpyxl")
+    buf.seek(0)
+    return buf.getvalue()
 
 
 def render_sidebar() -> pd.DataFrame | None:
@@ -115,19 +129,18 @@ def render_sidebar() -> pd.DataFrame | None:
             st.divider()
 
             if "processed_excel" not in st.session_state:
-                safe_df = sanitize_excel_dataframe(df)
-                buf = io.BytesIO()
-                safe_df.to_excel(buf, index=False, engine="openpyxl")
-                buf.seek(0)
-                st.session_state["processed_excel"] = buf.getvalue()
-
-            st.download_button(
-                label="Скачать обработанные данные",
-                data=st.session_state["processed_excel"],
-                file_name="processed_data.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                width="stretch",
-            )
+                if st.button("Подготовить файл Excel", width="stretch", key="prepare_processed_excel"):
+                    with st.spinner("Готовим файл для скачивания..."):
+                        st.session_state["processed_excel"] = build_processed_excel(df)
+                    st.rerun()
+            else:
+                st.download_button(
+                    label="Скачать обработанные данные",
+                    data=st.session_state["processed_excel"],
+                    file_name="processed_data.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    width="stretch",
+                )
 
     return st.session_state.get("df_main")
 

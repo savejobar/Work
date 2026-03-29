@@ -334,11 +334,16 @@ def run_full_pipeline(
     final["Продажа"] = final["Продажа"].fillna(0)
     final["Ремонт"]  = final["Ремонт"].fillna(0)
 
-    meta_order = [
-        c for c in final.columns
-        if c not in ["Приход", "Продажа", "Ремонт", "Конечный остаток"]
+    flow_order = [
+        "Приход",
+        "Продажа",
+        "Ремонт",
+        "Ремонт не подъемники",
+        "Ремонт всего",
+        "Конечный остаток",
     ]
-    final = final[meta_order + ["Приход", "Продажа", "Ремонт", "Конечный остаток"]]
+    meta_order = [c for c in final.columns if c not in flow_order]
+    final = final[meta_order + [c for c in flow_order if c in final.columns]]
 
     final = normalize_analog_lists(
         final, col_group="Номер группы", col_analogs="Список аналогов"
@@ -356,6 +361,6 @@ def run_full_pipeline(
     )
     final["Артикул"] = final["Номер группы"].map(article_map)
 
-    df = fill_flow_columns(final, ["Продажа", "Ремонт"])
+    df = fill_flow_columns(final, ["Продажа", "Ремонт", "Ремонт не подъемники", "Ремонт всего"])
 
     return df
