@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 from readers.loaders import get_matches
 from preprocessing.corrections import apply_corrections
@@ -121,7 +122,10 @@ def normalize_nomenclatures_stock_report(df: pd.DataFrame) -> pd.DataFrame:
     Нормализует номенклатуру в DataFrame склада.
     """
     df = apply_corrections(df, source="stock")
-
+    ##
+    df.loc[df['Номенклатура'] == 'Элемент воздушный DIFA 43123 C13145/2 43123', 'Оригинальный номер'] = np.nan
+    df.loc[df['Оригинальный номер'] == 'FORESTRY', 'Оригинальный номер'] = np.nan
+    ##
     cols = ["Артикул", "Оригинальный номер"]
     df[cols] = (
         df[cols]
