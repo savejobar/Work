@@ -231,8 +231,8 @@ def render_params() -> tuple[int, float | None, float, bool, bool]:
         )
     with col3:
         croston_threshold = st.slider(
-            "Порог нулей для TSB", min_value=0.1, max_value=0.8,
-            value=0.40, step=0.05,
+            "Порог нулей для TSB", min_value=0.1, max_value=0.9,
+            value=0.50, step=0.05,
             help="Если доля нулей в серии выше порога — применяется TSB",
         )
     with col4:
@@ -245,11 +245,11 @@ def render_params() -> tuple[int, float | None, float, bool, bool]:
         include_current_month = st.toggle(
             "Текущий месяц",
             value=True,
-            help="Если выключено, из расчёта исключается текущий календарный месяц по системной дате. Это полезно, если месяц ещё не завершён и данные неполные.",
+            help="Если выключено, из расчёта ремонтов и продаж исключается текущий календарный месяц по системной дате, но берется последний конечный остаток по каждому коду в пределах группы. Это полезно, если месяц ещё не завершён и данные неполные.",
         )
 
-    sub1, sub2, sub3, gap_sub1, sub4, gap_sub2, sub5 = st.columns([1, 1, 1, 0.2, 0.9, 0.2, 1.2])
-    with sub2:
+    sub_cols = st.columns([1, 1, 1, 0.2, 0.9, 0.2, 1.2])
+    with sub_cols[1]:
         no_outliers = st.toggle(
             "Не удалять выбросы",
             value=True,

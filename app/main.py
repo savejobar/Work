@@ -86,6 +86,14 @@ if df is None:
 # Параметры прогноза
 steps, iqr_factor, croston_threshold, show_clean, include_current_month = render_params()
 
+ending_stock_map = (
+    df.dropna(subset=["Конечный остаток"])
+    .sort_values(["Номер группы", "Год", "Месяц"], kind="mergesort")
+    .groupby("Номер группы")["Конечный остаток"]
+    .last()
+    .to_dict()
+)
+
 # Рабочий DataFrame для прогноза
 df_work = apply_current_month_policy(df, include_current_month)
 
@@ -194,6 +202,10 @@ else:
                 iqr_factor=iqr_factor,
                 croston_threshold=croston_threshold,
             )
+
+            stock_override = ending_stock_map.get(group_key)
+            if pd.notna(stock_override):
+                result.ending_stock = float(stock_override)
 
             results.append(result)
             log.info(

@@ -194,7 +194,7 @@ def _draw_panel(
     ax.margins(y=0.15)
     ax.set_xlabel("Период")
     ax.set_ylabel("Количество")
-    ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:,.0f}"))
+    ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:,.1f}"))
     ax.grid(axis="y", alpha=0.3)
     ax.legend(fontsize=8)
     for lbl in ax.get_xticklabels():

@@ -1,6 +1,6 @@
 import pandas as pd
 
-from preprocessing.normalization import safe_to_int
+DOMESTIC_COMPANIES = ['ЛК СПЕКТР', 'МЕГА МАШИНЕРИ', 'АК ФОРЛИФТ ООО', "БЕСТ ТЕХСЕРВИС", "ЙЕЛ РУС ООО"]
 
 
 def shortest_value(series: pd.Series) -> str | None:
@@ -55,10 +55,6 @@ def aggregate_repair_groups(df: pd.DataFrame) -> pd.DataFrame:
 
     res = qty.merge(meta, on="Номер группы", how="left")
 
-    for col in ["Ремонт", "Ремонт не подъемники", "Ремонт всего", "Номер группы"]:
-        if col in res.columns:
-            res[col] = res[col].apply(safe_to_int)
-
     return res
 
 
@@ -67,9 +63,9 @@ def aggregate_stock_groups(df: pd.DataFrame) -> pd.DataFrame:
     Агрегирует складские показатели по группам аналогов.
 
     Логика по остатку:
-    1. Внутри месяца берём последнюю запись по каждому Артикул в группе.
-    2. Протягиваем остаток по Артикул вперед по месяцам.
-    3. Складываем остатки всех Артикул группы.
+    1. Внутри месяца берём последнюю запись по каждому Код в группе.
+    2. Протягиваем остаток по Код вперед по месяцам.
+    3. Складываем остатки всех Кодов группы.
     """
     df = df.copy()
     df["_src_order"] = range(len(df))
@@ -92,11 +88,17 @@ def aggregate_stock_groups(df: pd.DataFrame) -> pd.DataFrame:
         .rename(columns={"Список_аналогов": "Список аналогов"})
     )
 
+    counterparty = df["Контрагент"].str.strip().str.upper()
+
+    external_sale_mask = counterparty.notna() & ~counterparty.isin(DOMESTIC_COMPANIES)
+    df["Расход_внешний"] = df["Расход"].where(external_sale_mask, 0)
+    df["Приход_внешний"] = df["Приход"].where(external_sale_mask, 0)
+
     qty = (
         df.groupby(["Год", "Месяц", "Номер группы"], as_index=False)
         .agg(
-            Расход=("Расход", "sum"),
-            Приход=("Приход", "sum"),
+            Расход=("Расход_внешний", "sum"),
+            Приход=("Приход_внешний", "sum"),
         )
     )
 
@@ -145,7 +147,6 @@ def aggregate_stock_groups(df: pd.DataFrame) -> pd.DataFrame:
         .ffill()
     )
 
-
     stock = (
         stock_grid
         .groupby(["Год", "Месяц", "Номер группы"], as_index=False)["Конечный остаток"]
@@ -158,31 +159,7 @@ def aggregate_stock_groups(df: pd.DataFrame) -> pd.DataFrame:
         how="outer",
     )
 
-    for col in ["Расход", "Конечный остаток", "Номер группы", "Приход"]:
-        if col in res.columns:
-            res[col] = res[col].apply(safe_to_int)
-
     return res.merge(meta, on="Номер группы", how="left")
-
-
-def calculate_external_sales(
-    stock_agg: pd.DataFrame,
-    repair_agg: pd.DataFrame,
-) -> pd.DataFrame:
-    """
-    Рассчитывает чистые внешние продажи:
-
-    Продажа = Расход (склад) − Ремонт всего
-    """
-    merged = stock_agg.merge(
-        repair_agg[["Год", "Месяц", "Номер группы", "Ремонт всего"]],
-        on=["Год", "Месяц", "Номер группы"],
-        how="left",
-    )
-
-    merged["Продажа"] = merged["Расход"] - merged["Ремонт всего"].fillna(0)
-
-    return merged.drop(columns=["Расход", "Ремонт всего"])
 
 
 def fill_flow_columns(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:

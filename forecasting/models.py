@@ -6,11 +6,15 @@ import numpy as np
 import pandas as pd
 
 
-CROSTON_THRESHOLD = 0.40
+CROSTON_THRESHOLD = 0.50
 TSB_DEFAULT_ALPHA = 0.1
 TSB_DEFAULT_BETA = 0.1
 MIN_SEASONAL_OBS = 24
 MIN_HOLT_OBS = 4
+MIN_TSB_OBS = 6
+RECENT_FALLBACK_DECAY = 0.80
+RECENT_FLOOR_START = 0.75
+RECENT_FLOOR_END = 0.45
 
 
 @dataclass
@@ -135,6 +139,19 @@ def _tsb_forecast(
     return pd.Series([fc_val] * steps, index=fc_index), method
 
 
+def _trailing_zeros(series: pd.Series) -> int:
+    """
+    Возвращает длину хвоста нулей в конце ряда.
+    """
+    cnt = 0
+    for v in reversed(series.tolist()):
+        if float(v) == 0:
+            cnt += 1
+        else:
+            break
+    return cnt
+
+
 def _ets_forecast(
     series: pd.Series,
     steps: int,
@@ -211,8 +228,17 @@ def forecast_series(
     Алгоритм выбора:
         1. Очищает выбросы через IQR (iqr_factor регулирует чувствительность).
            Если iqr_factor=None, очистка выбросов отключается.
-        2. Если доля нулей > croston_threshold → TSB для прерывистого спроса.
-        3. Иначе → лучшая ETS/Holt-Winters по AIC.
+        2. Если доля нулей > croston_threshold и ряд достаточно длинный
+           (n_obs >= MIN_TSB_OBS) → TSB для прерывистого спроса.
+        3. Иначе → лучшая ETS/Holt-Winters по AIC, либо Mean-6m как fallback
+           для коротких рядов.
+        4. Для ETS/Holt/HW прогноз дополнительно ограничивается снизу
+           относительно недавнего уровня по ненулевым последним месяцам,
+           чтобы хвост не падал слишком резко.
+        5. Если ETS/Holt/HW дал нулевой прогноз, но в последних месяцах есть
+           ненулевая активность, применяется запасной прогноз:
+           Recent-median-decay, либо для коротких рядов
+           Recent-mean-decay.
     """
     s_raw = series.clip(lower=0)
     n_obs = len(s_raw)
@@ -227,11 +253,46 @@ def forecast_series(
     fc_index = pd.date_range(fc_start_date, periods=steps, freq="MS")
     zero_ratio = (s_clean == 0).sum() / max(n_obs, 1)
 
-    if zero_ratio > croston_threshold:
+    if zero_ratio > croston_threshold and n_obs >= MIN_TSB_OBS:
         forecast, method = _tsb_forecast(s_clean, steps, fc_index)
         aic = None
     else:
         forecast, method, aic = _ets_forecast(s_clean, steps, fc_index, n_obs)
+
+        trailing_zeros = _trailing_zeros(s_clean)
+        recent_window = s_clean.tail(min(6, len(s_clean)))
+        recent_median = float(recent_window.median())
+        recent_nonzero = recent_window[recent_window > 0]
+
+        if np.isclose(float(forecast.sum()), 0.0):
+            if recent_median > 0:
+                fc_val = max(
+                    0.0,
+                    round(recent_median * (RECENT_FALLBACK_DECAY ** trailing_zeros), 2),
+                )
+                forecast = pd.Series([fc_val] * steps, index=fc_index)
+                method = f"Recent-median-decay(z={trailing_zeros})"
+                aic = None
+            elif len(recent_nonzero) > 0 and n_obs <= 6:
+                recent_mean_nonzero = float(recent_nonzero.mean())
+                fc_val = max(
+                    0.0,
+                    round(recent_mean_nonzero * 0.5 * (RECENT_FALLBACK_DECAY ** trailing_zeros), 2),
+                )
+                forecast = pd.Series([fc_val] * steps, index=fc_index)
+                method = f"Recent-mean-decay(z={trailing_zeros})"
+                aic = None
+        elif method in {"ETS", "Holt", "HW-add", "HW-mul"} and len(recent_nonzero) >= 3:
+            recent_level = float(recent_nonzero.median())
+            floor_factors = np.linspace(RECENT_FLOOR_START, RECENT_FLOOR_END, steps)
+            floor_values = np.round(recent_level * floor_factors, 2)
+
+            original_values = forecast.to_numpy(dtype=float)
+            adjusted_values = np.maximum(original_values, floor_values)
+            forecast = pd.Series(adjusted_values, index=fc_index).round(2)
+
+            if not np.allclose(original_values, adjusted_values):
+                method = f"Smoothed-{method}"
 
     return ForecastResult(
         forecast=forecast,

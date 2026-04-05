@@ -4,7 +4,6 @@ import io
 import tempfile
 import hashlib
 from pathlib import Path
-from typing import Any
 
 import pandas as pd
 import streamlit as st
@@ -27,6 +26,8 @@ STOCK_REQUIRED_RAW_COLS = [
     "Артикул",
     "Оригинальный номер",
     "Код",
+    "Документ движения (Регистратор)",
+    "Контрагент",
 ]
 
 
@@ -81,7 +82,6 @@ def render_sidebar() -> pd.DataFrame | None:
             st.markdown("**Остатки и обороты**")
             st.caption("Обязательные поля в исходном файле:")
             st.code("\n".join(STOCK_REQUIRED_RAW_COLS), language="text")
-            st.markdown("В отчете остатков обязательна группировка по годам и по месяцам.")
 
             st.warning(
                 "Не забудьте предобработать оба файла, приведя их к текстовому формату в Excel. "

@@ -29,10 +29,11 @@ STOCK_COLS = [
     "Номенклатура", 
     "Артикул", 
     "Оригинальный номер",
+    'Код',
+    "Документ движения (Регистратор)",
+    "Контрагент",
     "Приход",
     "Расход",
-    "Контрагент",
-    'Код',
     "Конечный остаток"
     ]
 
@@ -189,7 +190,7 @@ def preprocess_repair_parts(file_path: str) -> pd.DataFrame:
     df["Год"] = df["Дата"].dt.year.astype("Int64")
     df["Месяц"] = df["Дата"].dt.month.astype("Int64")
 
-    df["Количество"] = df["Количество"].str.replace(',', '.').astype(float).astype(int)
+    df["Количество"] = df["Количество"].str.replace(',', '.').astype(float)
 
     return df[REPAIR_COLS]
 
@@ -209,30 +210,11 @@ def preprocess_stock_report(file_path: str) -> pd.DataFrame:
     
     df["Номенклатура"] = df["Номенклатура"].str.strip()
 
-    # Парсинг периодов из заголовочных строк
-    period_mask = df["Номенклатура"].str.contains(
-        r"\d{4} г\.|\d квартал \d{4} г\."
-        r"|Январь|Февраль|Март|Апрель|Май|Июнь"
-        r"|Июль|Август|Сентябрь|Октябрь|Ноябрь|Декабрь",
-        na=False,
-    )
+    df = df.iloc[:-1]
 
-    period_labels = df["Номенклатура"].where(period_mask)
-    df["year"] = period_labels.str.extract(r"\b(20[2-9]\d)\b")
-    df["month"] = period_labels.str.extract(
-        r"(Январь|Февраль|Март|Апрель|Май|Июнь"
-        r"|Июль|Август|Сентябрь|Октябрь|Ноябрь|Декабрь)"
-    )
-    df[["year", "month"]] = df[["year", "month"]].ffill()
-    df = df[~period_mask]
-
-    month_map = {
-        "Январь": 1, "Февраль": 2, "Март": 3, "Апрель": 4,
-        "Май": 5, "Июнь": 6, "Июль": 7, "Август": 8,
-        "Сентябрь": 9, "Октябрь": 10, "Ноябрь": 11, "Декабрь": 12,
-    }
-    df["Месяц"] = df["month"].map(month_map).astype("Int64")
-    df["Год"] = df["year"].astype("Int64")
+    df['Период'] = pd.to_datetime(df['Период'], format='%d.%m.%Y %H:%M:%S')
+    df.loc[:, 'Год'] = df['Период'].dt.year
+    df.loc[:, 'Месяц'] = df['Период'].dt.month
 
     df = df.loc[df["Артикул"].notna() | df["Оригинальный номер"].notna()]
 
@@ -240,7 +222,7 @@ def preprocess_stock_report(file_path: str) -> pd.DataFrame:
         df[col] = pd.to_numeric(
         df[col].astype(str).str.replace(' ', '').str.replace(',', '.'),
         errors='coerce')
-        df.loc[df[col] < 0, col] = 0
+        # df.loc[df[col] < 0, col] = 0
         
         if col != 'Конечный остаток':
             df[col] = df[col].fillna(0)

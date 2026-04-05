@@ -5,7 +5,6 @@ import pandas as pd
 from features.aggregation import (
     aggregate_repair_groups,
     aggregate_stock_groups,
-    calculate_external_sales,
     fill_flow_columns,
 )
 from preprocessing.cleaning import (
@@ -309,7 +308,8 @@ def run_full_pipeline(
     )
     df2["Номер группы"] = df2["Номер группы"].astype("Int64")
     agg = aggregate_stock_groups(df2)
-    agg = calculate_external_sales(agg, df_quarter)
+
+    agg = agg.rename(columns={"Расход": "Продажа"})
 
     final = pd.merge(
         df_quarter, agg,
