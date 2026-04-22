@@ -124,8 +124,8 @@ def _tsb_forecast(
     best_z = float(vals[0])
     best_p = 1.0
 
-    for alpha in np.arange(0.05, 0.55, 0.05):
-        for beta in np.arange(0.05, 0.55, 0.05):
+    for alpha in np.arange(0.30, 0.55, 0.05):
+        for beta in np.arange(0.05, 0.30, 0.05):
             z, p, mse = fit_tsb(float(alpha), float(beta))
             if mse < best_mse:
                 best_mse = mse
