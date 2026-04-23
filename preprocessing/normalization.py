@@ -5,19 +5,25 @@ import pandas as pd
 
 
 ANALOG_SUFFIXES: tuple[str, ...] = (
-    "A", "А",            # латиница + кириллица
-    "B", "C", "F", "K",
-    "GT", "IN",
+    "A",
+    "А",  # латиница + кириллица
+    "B",
+    "C",
+    "F",
+    "K",
+    "GT",
+    "IN",
     " Б/У",
     "Б/У",
     "-L1",
-    " JR", " NSK",
+    " JR",
+    " NSK",
 )
 
 ANALOG_PREFIXES: tuple[str, ...] = (
-    "W",     # WG0300002  → G0300002
-    "AVX",   # AVX10X1125 → 10X1125
-    "4Т-",   # 4Т-33006   → 33006
+    "W",  # WG0300002  → G0300002
+    "AVX",  # AVX10X1125 → 10X1125
+    "4Т-",  # 4Т-33006   → 33006
 )
 
 
@@ -55,7 +61,12 @@ def article_forms(val: Any) -> list[str]:
         forms.append(candidate)
 
         stripped = candidate.lstrip("0")
-        if stripped and stripped != candidate and stripped[0] not in "-/. _" and stripped not in seen:
+        if (
+            stripped
+            and stripped != candidate
+            and stripped[0] not in "-/. _"
+            and stripped not in seen
+        ):
             seen.add(stripped)
             forms.append(stripped)
 
@@ -68,7 +79,7 @@ def article_forms(val: Any) -> list[str]:
 
     for pre in ANALOG_PREFIXES:
         if base.startswith(pre) and len(base) > len(pre):
-            root = base[len(pre):].lstrip()
+            root = base[len(pre) :].lstrip()
             add_form(root)
 
     return forms
@@ -87,6 +98,8 @@ def extract_articles(text: str, match_keys: Iterable[str]) -> list[str]:
         return ["kw1634in", "kw1634"]
     if "ST40722" in text:
         return ["ST40722(1)", "ST40722(2)"]
+    if "Фильтр воздушный (комплект - наружный + внутренний) AF25557" in text:
+        return ["AF25557", "AF25558"]
 
     found = []
     for key in match_keys:
