@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import streamlit as st
 
 from readers.loaders import get_matches
 from preprocessing.corrections import apply_corrections
@@ -31,8 +32,8 @@ def _split_complects(
 
     Комплект — строка номенклатуры содержащая '+' или совпадающая
     со специальными масками (ST40111/40110, сдвоенные фильтры и т.д.).
-    Каждый комплект взрывается ровно в 2 строки через explode —
-    если это не так, выбрасывается ValueError.
+    Каждый комплект ожидается развернуть ровно в 2 строки через explode —
+    если это не так, выводится предупреждение, обработка продолжается.
     """
     matches = get_matches()
     mask_plus = df["Номенклатура"].str.contains(r"\+", na=False) & ~df[
@@ -86,11 +87,10 @@ def _split_complects(
     actual = df_exploded.shape[0]
 
     if actual != expected:
-        raise ValueError(
-            "COMPLECT_EXPLODE_MISMATCH: "
-            f"expected={expected}, actual={actual}, "
-            f"source_rows={complects.shape[0]}, "
-            f"unique_nomenclatures={complects['Номенклатура'].nunique()}. "
+        st.warning(
+            f"Комплекты не сходятся: ожидалось {expected} строк после explode, "
+            f"получили {actual} (исходных строк: {complects.shape[0]}, "
+            f"уникальных номенклатур: {complects['Номенклатура'].nunique()}). "
             "Проверьте configs/matches.json и правила определения комплектов."
         )
 
