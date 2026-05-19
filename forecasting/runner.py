@@ -83,10 +83,13 @@ def _build_monthly_group_frame(
     train_end = pd.Timestamp(year=train_end_year, month=train_end_month, day=1)
 
     monthly = grp.copy()
+    monthly["Год"] = pd.to_numeric(monthly["Год"], errors="coerce").astype("Int64")
+    monthly["Месяц"] = pd.to_numeric(monthly["Месяц"], errors="coerce").astype("Int64")
+    monthly = monthly.dropna(subset=["Год", "Месяц"]).copy()
     monthly["_date"] = pd.to_datetime(
-        monthly["Год"].astype(str)
+        monthly["Год"].astype(int).astype(str)
         + "-"
-        + monthly["Месяц"].astype(str).str.zfill(2)
+        + monthly["Месяц"].astype(int).astype(str).str.zfill(2)
         + "-01"
     )
     monthly = monthly[monthly["_date"] <= train_end].sort_values("_date")
